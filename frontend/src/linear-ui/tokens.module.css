@@ -24,7 +24,15 @@
   --l-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --l-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06);
 
-  font-family: "Inter", "Noto Sans", system-ui, sans-serif;
+  /* IBM Plex Sans, not Inter — Inter (plus this exact slate/pill/soft-shadow
+     palette) is the single most recognizable "generic AI-generated SaaS UI"
+     signature at this point, precisely because it's the reflexive default for
+     both AI tools and quick clones. Plex is a genuine enterprise/dev-tool
+     typeface (IBM's own products, and a lot of serious technical software use
+     it) with more character in its letterforms than Inter's now-ubiquitous
+     neutrality, while staying in the same register as the Linear/Stripe
+     aesthetic this comparison was built to explore — not a detour from it. */
+  font-family: "IBM Plex Sans", "Noto Sans", system-ui, sans-serif;
   background: var(--l-canvas);
   color: var(--l-text);
   font-size: 14px;
@@ -48,7 +56,7 @@
   top: 12px;
   right: 16px;
   z-index: 50;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 12px;
   font-weight: 500;
   color: var(--l-text-muted);

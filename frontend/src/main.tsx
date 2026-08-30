@@ -15,11 +15,15 @@ import "@fontsource/noto-sans-mono/500.css";
 import "@fontsource/archivo/500.css";
 import "@fontsource/archivo/600.css";
 
-// Inter, for the exploratory Linear/Stripe-style comparison UI only (#linear route).
-// The shipped despatch register never uses it.
-import "@fontsource/inter/400.css";
-import "@fontsource/inter/500.css";
-import "@fontsource/inter/600.css";
+// IBM Plex Sans, for the exploratory Linear/Stripe-style comparison UI only (#linear
+// route). The shipped despatch register never uses it. Replaced Inter after the
+// author flagged the comparison as reading "AI-generated" — Inter plus a slate
+// palette and pill badges is the single most recognizable generic-SaaS-template
+// signature at this point; Plex is a genuine enterprise/dev-tool typeface instead
+// of the reflexive default.
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
 
 import Root from "./Root.tsx";
 
