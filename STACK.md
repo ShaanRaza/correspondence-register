@@ -1,6 +1,10 @@
 # STACK.md
 
-Tech stack proposal. Status: proposed, not decided. Model facts current as of 2026-08-30.
+Tech stack proposal. Model IDs and pricing **verified against official Anthropic documentation on 2026-08-30**.
+
+Decided (author, 2026-08-30): PostgreSQL is the single source of truth. **No Neo4j, no Redis/Celery, no separate vector database.** pgvector is secondary/semantic retrieval, never authoritative evidence.
+
+See [DATA_MODEL.md](DATA_MODEL.md), [db/schema.sql](db/schema.sql) and [PIPELINE.md](PIPELINE.md) for the concrete design.
 
 ---
 
@@ -151,13 +155,31 @@ Put all of them behind **one interface** returning a normalized `{text, tokens: 
 
 ## LLM — Claude Opus 5 (`claude-opus-5`)
 
-| Model | ID | Context | Input /MTok | Output /MTok | Role here |
-|---|---|---|---|---|---|
-| Claude Opus 5 | `claude-opus-5` | 1M | $5.00 | $25.00 | **extraction** |
-| Claude Sonnet 5 | `claude-sonnet-5` | 1M | $2.00 | $10.00 | bulk re-runs if cost bites |
-| Claude Haiku 4.5 | `claude-haiku-4-5` | 200K | $1.00 | $5.00 | document-type triage pre-pass |
+| Model | ID | Context | Max output | Input /MTok | Output /MTok | Batch in/out | Cache read | Role here |
+|---|---|---|---|---|---|---|---|---|
+| Claude Opus 5 | `claude-opus-5` | 1M | 128K | $5.00 | $25.00 | $2.50 / $12.50 | $0.50 | **extraction** |
+| Claude Sonnet 5 | `claude-sonnet-5` | 1M | 128K | $2.00 | $10.00 | $1.00 / $5.00 | $0.20 | bulk re-runs if cost bites |
+| Claude Haiku 4.5 | `claude-haiku-4-5` | 200K | 64K | $1.00 | $5.00 | $0.50 / $2.50 | $0.10 | document-type triage pre-pass |
 
-**Why Opus and not Sonnet.** The failure mode is a wrong clause number or a wrong date in a document that goes before a tribunal. Cost of error is high; volume is low. At roughly 3k input tokens per letter, re-extracting an entire 500-letter package is ~1.5M input tokens ≈ **$7.50**. The model is not the cost centre. Being wrong is.
+Verified against the official models overview and pricing pages on 2026-08-30. Cache writes are 1.25x base input (5-minute TTL) or 2x (1-hour); cache reads are 0.1x. The full 1M context is charged at standard rates — no long-context surcharge.
+
+Two notes from that check:
+
+- **Sonnet 5's $2/$10 is now the standard price.** It was announced as introductory pricing through 31 Aug 2026; the scheduled increase to $3/$15 has been cancelled.
+- **Opus 5 and Sonnet 5 use the tokenizer introduced with Opus 4.7, which produces roughly 30% more tokens for the same text** than Sonnet 4.6 and earlier. Re-baseline any token estimate carried over from an older model with `count_tokens` rather than assuming.
+
+**Why Opus and not Sonnet.** The failure mode is a wrong clause number or a wrong date in a document that goes before a tribunal. Cost of error is high; volume is low.
+
+**Corrected cost estimate.** My earlier figure of ~$7.50 per package was wrong — it counted only input tokens. Output dominates, because *thinking tokens bill at the output rate*. Re-estimating a 500-letter package on Opus 5, with caching and the Batch API:
+
+| Line | Tokens | Rate | Cost |
+|---|---|---|---|
+| Uncached input (~2k/letter) | 1.0M | $2.50 batch | $2.50 |
+| Cache reads (~20k prefix/letter) | 10.0M | $0.25 batch | $2.50 |
+| Output + thinking (~3k/letter) | 1.5M | $12.50 batch | $18.75 |
+| **Total** | | | **~$24** |
+
+Roughly **$48** without the Batch API. Treat these as an order of magnitude, not a quote — measure with `count_tokens` and a 20-letter pilot before budgeting. The conclusion is unchanged and if anything stronger: the model is not the cost centre, being wrong is. But the cost lever is **output**, so `effort` is worth tuning (try `medium` for extraction) alongside prompt caching.
 
 Implementation notes, current as of the API today:
 
@@ -176,7 +198,14 @@ Implementation notes, current as of the API today:
 
 **Production:** AWS `ap-south-1`. S3 Object Lock is the cleanest write-once story, RDS Postgres supports pgvector, and Indian enterprise buyers are already comfortable with it.
 
-**Anthropic API:** first-party rather than Bedrock. `inference_geo` is available as a top-level request parameter if inference-location pinning is required, and `response.usage.inference_geo` reports where it ran. If a prospect mandates AWS-only, Bedrock is possible via the Mantle client, at the cost of some feature availability.
+**Anthropic API:** first-party rather than Bedrock.
+
+**Correction to what I said earlier.** I implied `inference_geo` could pin inference to India. It cannot — the parameter takes `"us"` or `"global"` (the default), and `"us"` carries a 1.1x price multiplier on every token category. **There is no India inference geography.** So the residency story splits in two, and you should be precise about it with prospects:
+
+- **Documents and extracted data** stay in India — S3 `ap-south-1`, RDS in the same region. You control this completely.
+- **Inference** runs on Anthropic's global infrastructure. If a prospect's constraint is genuinely "no data leaves India", the hosted LLM path does not satisfy it, and you need that conversation early rather than late.
+
+Partner platforms (Bedrock, Google Cloud) have their own regional endpoints and independent pricing, at a 10% premium over global; that is the route if a prospect requires a contractual regional guarantee. Bedrock costs some feature availability (no fast mode, no Claude API-only features).
 
 **Demo:** do not deploy anything. A pre-sales demo on 10 documents needs zero cloud architecture.
 
