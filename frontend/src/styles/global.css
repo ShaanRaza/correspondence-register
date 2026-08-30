@@ -1,0 +1,64 @@
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Any region that can contain Devanagari needs generous line-height so matras and
+   conjuncts don't clip against the Latin em box (DESIGN.md, bilingual section). */
+body,
+input,
+textarea {
+  line-height: 1.55;
+}
+
+/* Tabular numerals everywhere a number can appear, so columns of dates and figures
+   align on the digit rather than drifting with proportional widths. */
+table,
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: #cfe0f2;
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--locate);
+  outline-offset: 1px;
+}
+
+* {
+  caret-color: var(--locate);
+  scrollbar-color: var(--rule-major) var(--ground);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}

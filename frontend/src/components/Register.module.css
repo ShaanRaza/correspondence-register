@@ -1,0 +1,153 @@
+/* Column widths match DESIGN.md exactly: STATUS 76 / SR 40 / DATED 88 / RECEIVED 88 /
+   PARTIES 84 / LETTER REF 150 / SUBJECT flex / CHAINAGE 100 / CLAUSE 90 / THREAD 110 /
+   REPLY IN 68. Sums to 1334px at 1366 viewport width with 16px page gutters. */
+.gridTemplate {
+  display: grid;
+  grid-template-columns:
+    76px 40px 88px 88px 84px 150px minmax(280px, 1fr) 100px 90px 110px 68px;
+}
+
+.wrapper {
+  flex: 1;
+  overflow: auto;
+  background: var(--field);
+}
+
+.headRow {
+  composes: gridTemplate;
+  height: 28px;
+  position: sticky;
+  top: 0;
+  background: var(--field);
+  border-bottom: 1px solid var(--rule-major);
+  z-index: 1;
+}
+
+.headCell {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-right: 1px solid var(--rule);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.headCell:last-child {
+  border-right: none;
+}
+
+.row {
+  composes: gridTemplate;
+  min-height: 32px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row:hover {
+  background: var(--field-alt);
+}
+
+.threadAlt .row {
+  background: var(--field-alt);
+}
+
+.threadAlt .row:hover {
+  background: var(--field);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  padding: 6px var(--space-2);
+  border-right: 1px solid var(--rule);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.cell:last-child {
+  border-right: none;
+}
+
+.mono {
+  font-family: var(--font-value);
+}
+
+.parties {
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusOuterCell {
+  padding: 0;
+  border-right: none;
+}
+
+.right {
+  justify-content: flex-end;
+}
+
+.subjectCell {
+  font-family: var(--font-text);
+  line-height: 1.55; /* Devanagari-safe, applies everywhere subject text can appear */
+}
+
+.emptyDash {
+  color: var(--ink-3);
+}
+
+/* --- status gutter --- */
+.statusCell {
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.statusBar {
+  width: 3px;
+  flex: none;
+}
+
+.statusWord {
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-2);
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statusReview .statusBar {
+  background: var(--flag-review);
+}
+.statusReview .statusWord {
+  color: var(--flag-review);
+}
+
+.statusVerified .statusBar {
+  background: var(--flag-verified);
+}
+.statusVerified .statusWord {
+  color: var(--flag-verified);
+}
+
+/* unverified: absence is data. No bar, no word — documented in the column head,
+   never signalled with colour or noise on every ordinary row. */
+
+/* --- reply-in: the register shows the elapsed figure only, mono, never coloured,
+   never benchmarked. Its two endpoints are not hidden behind a tooltip (DESIGN.md
+   forbids a tooltip carrying data that exists nowhere else) — they are shown on the
+   thread screen instead, which is where the elapsed-span figure is the monumental
+   moment DESIGN.md reserves for that screen. --- */
+.replyIn {
+  font-family: var(--font-value);
+}

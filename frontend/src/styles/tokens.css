@@ -1,0 +1,32 @@
+/* Design tokens from DESIGN.md. Light mode only — no dark-mode block exists, and
+   none should be added; DESIGN.md is explicit that this is not a themeable surface. */
+:root {
+  /* structure */
+  --ground: #e8ebee;
+  --field: #ffffff;
+  --field-alt: #f4f6f8;
+  --rule: #d3d9de;
+  --rule-major: #9aa5ae;
+  --ink: #14181c;
+  --ink-2: #5a646d;
+  --ink-3: #707a82;
+
+  /* meaning — four colours, no fifth */
+  --flag-review: #b4341f;
+  --flag-verified: #1f5e3d;
+  --locate: #0b5cad;
+
+  /* type */
+  --font-text: "Noto Sans", sans-serif;
+  --font-value: "Noto Sans Mono", monospace;
+  --font-head: "Archivo", sans-serif;
+
+  /* spacing, 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+}
