@@ -2,7 +2,7 @@
 
 Tech stack proposal. Model IDs and pricing **verified against official Anthropic documentation on 2026-08-30**.
 
-Decided (author, 2026-08-30): PostgreSQL is the single source of truth. **No Neo4j, no Redis/Celery, no separate vector database.** pgvector is secondary/semantic retrieval, never authoritative evidence.
+Decided (author, 2026-08-30): PostgreSQL is the single source of truth for register, provenance, and relationships. Precisely: **object storage holds the immutable original bytes; PostgreSQL is the authoritative metadata, evidence, and register store built on top of them** — the SHA-256, provenance, extraction history, and every relationship live in Postgres, but the originals themselves live in the object store. **No Neo4j, no Redis/Celery, no separate vector database.** pgvector is secondary/semantic retrieval, never authoritative evidence.
 
 See [DATA_MODEL.md](DATA_MODEL.md), [db/schema.sql](db/schema.sql) and [PIPELINE.md](PIPELINE.md) for the concrete design.
 
@@ -238,7 +238,8 @@ Leave two or three documents genuinely flagged `Needs review`. A register that c
 - Job queue, retries, resumability, partial-failure handling
 - Annexure bundle generation (job 7) — PDF assembly with consecutive numbering; only build now if it is a talking point
 - Observability, Batch API, on-prem Tesseract packaging
-- Incremental re-ingestion when the extractor improves
+- Incremental re-ingestion when the extractor improves — the schema now supports this (letters are versioned; see DATA_MODEL.md and PIPELINE.md § "Reprocessing an already-published document"), but the matching heuristic that decides which existing letter a new extraction corresponds to has no code yet
+- **Database-role-level immutability.** `documents`/`extracted_fields`/`letters` reject mutation via trigger today, which holds against ordinary application code but not against a role with trigger-bypass privilege. A production deployment should also `REVOKE UPDATE, DELETE` on these tables from the application's normal role, so immutability is enforced at two independent layers, not one. No roles exist yet to revoke anything from — this is a deployment-time task, not a schema one.
 
 ---
 
