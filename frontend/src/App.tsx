@@ -2,12 +2,17 @@ import { useMemo, useState } from "react";
 import { TitleBlock } from "./components/TitleBlock";
 import { FilterBand, EMPTY_FILTERS, type Filters } from "./components/FilterBand";
 import { Register } from "./components/Register";
+import { ThreadScreen } from "./components/ThreadScreen";
 import { letters, packageInfo } from "./data/fixtures";
 import { parseChainageMetres } from "./lib/chainage";
+import type { Letter } from "./types";
 import "./styles/global.css";
+
+type View = { screen: "register" } | { screen: "thread"; threadKey: string; selectedId: string };
 
 function App() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [view, setView] = useState<View>({ screen: "register" });
 
   const visible = useMemo(() => {
     return letters.filter((l) => {
@@ -32,11 +37,26 @@ function App() {
     });
   }, [filters]);
 
+  const openThread = (letter: Letter) => {
+    setView({ screen: "thread", threadKey: letter.threadKey, selectedId: letter.id });
+  };
+
+  if (view.screen === "thread") {
+    const threadLetters = letters.filter((l) => l.threadKey === view.threadKey);
+    return (
+      <ThreadScreen
+        letters={threadLetters}
+        initialSelectedId={view.selectedId}
+        onBack={() => setView({ screen: "register" })}
+      />
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <TitleBlock pkg={packageInfo} visibleCount={visible.length} />
       <FilterBand filters={filters} onChange={setFilters} />
-      <Register letters={visible} />
+      <Register letters={visible} onOpen={openThread} />
     </div>
   );
 }

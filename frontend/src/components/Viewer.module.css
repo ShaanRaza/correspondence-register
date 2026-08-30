@@ -1,0 +1,58 @@
+.pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  position: relative;
+}
+
+.chrome {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-value);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.chromeLabel {
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.page {
+  flex: 1;
+  margin: 0 var(--space-3) var(--space-3);
+  border: 1px solid var(--rule-major);
+  /* deliberately warmer/lighter than --ground, in the range a real scanned
+     letterhead sits in — see DESIGN.md's colour section on why the gap matters */
+  background: #f5f1e8;
+  padding: var(--space-8);
+  overflow-y: auto;
+}
+
+.pageRef {
+  font-family: var(--font-value);
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-bottom: var(--space-4);
+}
+
+.pageSubject {
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  margin-bottom: var(--space-4);
+}
+
+.pageBody {
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}

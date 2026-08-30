@@ -1,0 +1,98 @@
+.list {
+  padding: var(--space-2) 0;
+}
+
+.entry {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* One struck emphasis: the selected entry is full ink; everything else recedes to
+   ink-2. No second signal (no background tint, no border, no bold) competes with it. */
+.entry.selected {
+  color: var(--ink);
+}
+
+.entry:not(.selected) {
+  color: var(--ink-2);
+}
+
+.entry:hover {
+  background: var(--field-alt);
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: 2px;
+}
+
+.serial {
+  font-family: var(--font-value);
+  font-size: 12px;
+}
+
+.dated {
+  font-family: var(--font-value);
+  font-size: 12px;
+}
+
+.ref {
+  font-family: var(--font-value);
+  font-size: 12px;
+}
+
+.parties {
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+.subject {
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.statusWord {
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statusReview {
+  color: var(--flag-review);
+}
+
+.statusVerified {
+  color: var(--flag-verified);
+}
+
+/* --- the gap gutter between two entries: the one monumental figure --- */
+.gap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--field-alt);
+}
+
+.gapFigure {
+  font-family: var(--font-value);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.gapEndpoints {
+  font-family: var(--font-value);
+  font-size: 11px;
+  color: var(--ink-2);
+}
