@@ -2,3 +2,8 @@ node_modules/
 dist/
 .DS_Store
 .impeccable/config.local.json
+.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
