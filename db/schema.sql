@@ -28,7 +28,15 @@ CREATE TYPE citation_state     AS ENUM ('resolved','unresolved_missing','unresol
 CREATE TYPE run_status         AS ENUM ('running','succeeded','failed','superseded');
 CREATE TYPE job_status         AS ENUM ('queued','running','succeeded','failed','cancelled');
 CREATE TYPE job_type           AS ENUM ('intake','rasterize','ocr','extract','validate','assemble','link','embed');
-CREATE TYPE review_action      AS ENUM ('verified','rejected','corrected');
+-- 'flagged': distinct from the other three, which are all HUMAN judgments recorded by
+-- record_field_verification()/record_field_correction(). 'flagged' is written by the
+-- PIPELINE itself (actor is a system identifier like 'pipeline:reprocessing') when an
+-- automated process — reprocessing-match is the first case — cannot confidently decide
+-- something and needs a human to look at it. Surfaced while wiring the S6 match
+-- heuristic to real writes: PIPELINE.md already promised "routes to needs_review with
+-- a review_events note" for an ambiguous match, and there was no action value that
+-- actually fit a machine-generated note.
+CREATE TYPE review_action      AS ENUM ('verified','rejected','corrected','flagged');
 
 -- ---------------------------------------------------------------- org
 
