@@ -1,0 +1,120 @@
+{
+  "title": "Choose the visual world",
+  "question": "Roll de50035e assigned Time-Impact Sheet (candidate 7 of 7). Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Time-Impact Sheet",
+      "kicker": "THE ROLL",
+      "lineage": "the time-scaled baseline programme and as-planned-vs-as-built delay window — the drafting language these same people already use to argue an EOT",
+      "thesis": "The register is a time-scaled sheet, not a sortable table. Every letter is pinned to the contract calendar, so an unanswered stretch is a visible empty span rather than a number you have to trust. Refuses the category default: the slate data-table with a left sidebar, filter chips and a blue accent.",
+      "palette": ["#E9EDEF", "#FBFCFC", "#11161B", "#A32B1C"],
+      "materials": ["cool drafting ground", "hairline plot rules", "pen-plotter ink", "untinted scan"],
+      "viewport": "A drawing title block across the top states the package, the period covered, and completeness as fact — 'NH-XX PKG-3 · 14 Mar 2023 – 09 Aug 2026 · 10 of 10 ingested · 0 unread'. Beneath it, the sheet: a fixed left index column carrying Sr. No. / date / letter ref. in the Excel register's own column grammar, and to its right a time axis running the full contract period. Each letter is a tick on that axis — outward above the centreline, inward below, exactly as a plan sits above a profile. Position carries direction; no colour does. The 47-day gap in the middle of 2024 is empty sheet, and you can see it before you can read it.",
+      "risk": "A time axis can imply schedule analysis the register does not actually perform — it charts correspondence, not float. And if the ticks bunch, the axis smears at 1366×768. Both are real; both are fixable with a strict collision rule, and neither is deniable.",
+      "raised": [
+        { "from": "Struck Cathode Gauze (declined)", "raise": "Exactly one struck emphasis on screen at a time. The selected letter is full ink and crisp; every other letter stays present but at reduced ink. Nothing else competes for emphasis — no second highlight, no hover glow, no active-state accent." },
+        { "from": "Viewfinder Bracket HUD (declined)", "raise": "The scanned page is never boxed in a card. Evidence runs full-bleed and the chrome retreats to corner-pinned readouts at the safe-area margins, so the paper is never a thumbnail inside our furniture." },
+        { "from": "Studio Dumbar Identity (declined)", "raise": "Where colour appears it owns a whole region at full height — a full-height band down a row — never a scattered dot, pill or chip." },
+        { "from": "Alphabet Storm (declined)", "raise": "One monumental typographic moment is permitted per screen. The elapsed-span readout is set at display scale, not table scale — the only place this dense sheet raises its voice." }
+      ],
+      "board": "https://impeccable.style/worlds/cards/operate-b-struck-cathode-gauze.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "Despatch Register",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "the bound government inward/outward despatch register and the file noting sheet — treasury ruling, Sr. No. columns, numbered paras, red-ink noting in the margin",
+      "thesis": "The direct ancestor of the Excel file they keep today, done properly. Ruled columns that never move, a running serial number nothing can reorder, and margin noting where the machine's extraction annotates the clerk's row.",
+      "palette": ["#F2F0EA", "#FFFFFF", "#141414", "#8C2F1E"],
+      "materials": ["treasury ruling", "bound ledger", "red noting ink"],
+      "viewport": "One continuous ruled register, serial numbers running down the left edge, extraction annotations set in the margin like a noting sheet.",
+      "risk": "This is where most runs land once they know the incumbent is an Excel register — and it is the safest thing to show a contracts manager. Its strength and its ceiling are the same fact: it looks like what they already have, so it proves familiarity rather than capability.",
+      "board": "https://impeccable.style/worlds/cards/studio-dumbar-identity.webp"
+    },
+    {
+      "id": "challenger-teletext",
+      "label": "Teletext Service",
+      "verdict": "competitive",
+      "lineage": "broadcast teletext magazines — 40×24 character cells, three-digit page addressing, the fixed broadcast eight",
+      "thesis": "Every letter carries a three-digit address you key directly. No search field, no filter UI — you type the number and you are there. The rigid character lattice does the density work a table normally fakes.",
+      "palette": ["#0000C0", "#FFFF00", "#00C000", "#FFFFFF"],
+      "materials": ["block mosaic", "character-cell lattice"],
+      "viewport": "An index page, letters as numbered rows in a strict cell grid.",
+      "case": "Holds product clarity — direct addressing maps exactly onto letter reference numbers, and a fixed cell lattice is honest density. Loses audience identification: the black ground breaks light-mode-only and the meeting-room projector, and a bitmap face cannot set Devanagari.",
+      "risk": "Reads as retro novelty the moment the grid slips, which is fatal in front of a tribunal.",
+      "hero": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service.webp"
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "verdict": "competitive",
+      "lineage": "stage lighting cyclorama — horizon bands from night through cobalt and rose to white day, lighting-plot stencil caps, a scrubbable cue timeline",
+      "thesis": "The dispute as a cue sheet. Named, deep-linkable states you scrub between, every transition inspectable, colour never the sole signal.",
+      "palette": ["#0B0E14", "#1B3A6B", "#C98A9B", "#FFFFFF"],
+      "materials": ["horizon bands", "stencil caps", "cue timeline"],
+      "viewport": "The chronology as a scrubbable cue timeline, phases stacked as horizon bands.",
+      "case": "Holds product clarity outright — named, deep-linkable, text-equivalent states with 'colour is never the sole signal' as a system rule is close to purpose-built for an evidentiary chronology. Loses audience identification: the depthless black cyc ground breaks light-mode-only, and dawn-to-day as a metaphor for a contractual dispute is decoration a tribunal would not forgive.",
+      "risk": "Atmosphere reads as interpretation, and interpretation is the one thing this tool has no standing to offer.",
+      "hero": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn.webp"
+    },
+    {
+      "id": "challenger-cathode",
+      "label": "Struck Cathode Gauze",
+      "verdict": "declined",
+      "lineage": "nixie decade counter behind bronze anode gauze",
+      "palette": ["#0A0D14", "#FF7A18"],
+      "materials": ["bronze gauze", "cathode glow"],
+      "case": "Loses both axes. Dark ground and glowing orange break light-mode-only and the projector; 'no rules, boxes or dividers anywhere' is a defect, not a feature, in a dense evidentiary table.",
+      "kept": "Exactly one struck emphasis at a time — everything else present but subordinate.",
+      "hero": "https://impeccable.style/worlds/cards/operate-b-struck-cathode-gauze-hero.webp"
+    },
+    {
+      "id": "challenger-viewfinder",
+      "label": "Viewfinder Bracket HUD",
+      "verdict": "declined",
+      "lineage": "camcorder OSD — corner focus brackets, zebra stripes, tape counter",
+      "palette": ["#000000", "#FFFFFF", "#FFB100"],
+      "materials": ["segmented OSD ink", "zebra stripes", "letterbox bars"],
+      "case": "Loses both axes. Blend-mode chrome composited over a scanned Authority Engineer letter destroys the legibility of the evidence, and the reference is a pop-culture toy to a 55-year-old contracts manager.",
+      "kept": "Evidence always full-bleed beneath; chrome pinned to the safe-area corners, never occupying the centre.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-viewfinder-bracket-hud-hero.webp"
+    },
+    {
+      "id": "challenger-dumbar",
+      "label": "Studio Dumbar Identity",
+      "verdict": "declined",
+      "lineage": "modular Dutch identity — saturated blocks snapped over photography",
+      "palette": ["#00A3E0", "#E6007E", "#FFED00", "#3FA535"],
+      "materials": ["flat vector bars", "photographic mid-tones"],
+      "case": "Loses both axes. Cyan-magenta-yellow bars over a government letterhead is precisely the clash the constraints forbid, and 'looking like a startup product' is a disqualifier the author named directly.",
+      "kept": "Colour owns whole regions at full height rather than scattering as accents.",
+      "hero": "https://impeccable.style/worlds/cards/studio-dumbar-identity-hero.webp"
+    },
+    {
+      "id": "challenger-alphabet",
+      "label": "Alphabet Storm",
+      "verdict": "declined",
+      "lineage": "letters condensing into weather and reshaping the ground",
+      "palette": ["#FFFFFF", "#0A0A0A", "#C0C6CC"],
+      "materials": ["monumental grotesk as matter", "rain grey"],
+      "case": "Loses both axes, catastrophically. Language as reversible physical consequence is the opposite of a register whose entire value is that nothing moves and nothing is reinterpreted.",
+      "kept": "One monumental typographic moment is permitted, even in a dense tool.",
+      "hero": "https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-alphabet-storm-hero.webp"
+    }
+  ],
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The legal-tech docket table, executed impeccably. White ground, slate ink, one blue accent, left sidebar of packages, filter chips above a sortable table, a right drawer for the document.",
+    "palette": ["#FFFFFF", "#0F172A", "#2563EB", "#E2E8F0"],
+    "materials": ["clean grid", "system stack", "drawer overlay"],
+    "viewport": "Sidebar, filter row, sortable table, detail drawer — the arrangement the visitor expects, at full craft.",
+    "risk": "Indistinguishable from every document-review platform they have already been pitched, and its drawer pattern collides directly with your 'no progressive disclosure' rule."
+  },
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true,
+  "buildPath": { "value": "code", "toggle": false }
+}
