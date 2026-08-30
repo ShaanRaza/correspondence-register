@@ -30,11 +30,7 @@ export default function Root() {
 
   return (
     <Suspense fallback={null}>
-      {hash === "#linear" ? (
-        <LinearApp onExit={() => (window.location.hash = "")} />
-      ) : (
-        <App />
-      )}
+      {hash === "#linear" ? <LinearApp /> : <App />}
     </Suspense>
   );
 }

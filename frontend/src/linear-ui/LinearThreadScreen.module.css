@@ -5,19 +5,20 @@
   min-height: 0;
 }
 
+/* Same dark navy bar as LinearTitleBar, for consistency across both screens. */
 .header {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 14px 24px;
-  background: var(--l-surface);
-  border-bottom: 1px solid var(--l-border);
+  background: var(--l-bar-bg);
+  flex-shrink: 0;
 }
 
 .back {
   font-size: 13px;
   font-weight: 500;
-  color: var(--l-blue);
+  color: var(--l-bar-accent);
   background: none;
   border: none;
   cursor: pointer;
@@ -27,18 +28,18 @@
 }
 
 .back:hover {
-  background: var(--l-canvas);
+  background: var(--l-bar-pill-bg);
 }
 
 .title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--l-text);
+  color: var(--l-bar-text);
 }
 
 .threadKey {
   font-size: 12px;
-  color: var(--l-text-muted);
+  color: var(--l-bar-text-muted);
   font-family: ui-monospace, "SF Mono", monospace;
 }
 

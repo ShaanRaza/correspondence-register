@@ -26,6 +26,24 @@
   --l-blue: #3b82f6;
   --l-blue-ring: rgba(59, 130, 246, 0.35);
 
+  /* A real colour surface for the title bars, added because the page otherwise
+     stacks three near-identical near-whites (canvas, surface, bordered inputs) and
+     reads as flat regardless of how the text within it is coloured -- there was no
+     amount of label re-tinting that was going to fix that on its own. A deep,
+     genuinely blue navy (not neutral slate-900) rather than plain black, so it
+     reads as a colour choice, not just "dark mode for one bar". */
+  --l-bar-bg: #14213d;
+  --l-bar-text: #f8fafc;
+  --l-bar-text-muted: rgba(248, 250, 252, 0.62);
+  --l-bar-pill-bg: rgba(248, 250, 252, 0.1);
+  --l-bar-pill-active-bg: rgba(248, 250, 252, 0.16);
+  --l-bar-border: rgba(248, 250, 252, 0.16);
+  /* --l-blue itself is only 4.34:1 against --l-bar-bg -- under the 4.5:1 text floor
+     -- so links/accents ON the dark bar use this lighter step instead (6.28:1);
+     --l-blue is unchanged for its existing light-background uses (focus rings,
+     selected-card borders). */
+  --l-bar-accent: #60a5fa;
+
   --l-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --l-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06);
 
@@ -56,24 +74,3 @@
   font-variant-numeric: tabular-nums;
 }
 
-.compareLink {
-  position: fixed;
-  top: 12px;
-  right: 16px;
-  z-index: 50;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--l-text-muted);
-  background: var(--l-surface);
-  border: 1px solid var(--l-border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-  box-shadow: var(--l-shadow-sm);
-  text-decoration: none;
-}
-
-.compareLink:hover {
-  background: var(--l-canvas);
-}

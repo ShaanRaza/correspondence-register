@@ -1,70 +1,77 @@
+/* Dark navy bar (--l-bar-bg), not another shade of near-white -- this is the
+   deliberate colour surface the rest of the page's flat white/slate-50/white
+   stacking was missing. */
 .bar {
   height: 56px;
   padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--l-surface);
-  border-bottom: 1px solid var(--l-border);
+  background: var(--l-bar-bg);
+  flex-shrink: 0;
 }
 
 .left {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
 }
 
 .packageName {
   font-size: 14px;
   font-weight: 600;
-  color: var(--l-text);
+  color: var(--l-bar-text);
+  white-space: nowrap;
 }
 
 .meta {
   font-size: 12px;
-  color: var(--l-text-muted);
+  color: var(--l-bar-text-muted);
+  white-space: nowrap;
 }
 
 .right {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-shrink: 0;
 }
 
-/* Segmented-control style status pill, replacing a heavy dark completeness bar */
 .segment {
   display: flex;
   align-items: center;
-  background: #f1f5f9;
+  background: var(--l-bar-pill-bg);
   border-radius: 8px;
   padding: 3px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .segmentItem {
   padding: 4px 10px;
   border-radius: 6px;
-  color: var(--l-text-muted);
+  color: var(--l-bar-text-muted);
 }
 
 .segmentItemActive {
-  background: var(--l-surface);
-  color: var(--l-text);
-  box-shadow: var(--l-shadow-sm);
+  background: var(--l-bar-pill-active-bg);
+  color: var(--l-bar-text);
   font-weight: 500;
 }
 
 .queryButton {
   font-size: 12px;
   font-weight: 500;
-  color: var(--l-text);
-  background: var(--l-surface);
-  border: 1px solid var(--l-border);
+  color: var(--l-bar-text);
+  background: transparent;
+  border: 1px solid var(--l-bar-border);
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .queryButton:hover {
-  background: var(--l-canvas);
+  background: var(--l-bar-pill-bg);
 }

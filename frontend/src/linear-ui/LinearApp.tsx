@@ -15,7 +15,12 @@ import type { Letter } from "../types";
 // the components, styling, and tokens differ.
 type View = { screen: "register" } | { screen: "thread"; threadKey: string; selectedId: string };
 
-export function LinearApp({ onExit }: { onExit: () => void }) {
+// No exit-to-despatch-register link (removed on request) -- a fixed-position
+// "Back to Despatch Register" pill used to float over LinearTitleBar's own
+// right-aligned content and visibly overlapped it. Browser Back still works (hash
+// changes push a history entry), and localhost:5173 with no hash returns to the
+// shipped register directly.
+export function LinearApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [view, setView] = useState<View>({ screen: "register" });
   const [queryOpen, setQueryOpen] = useState(false);
@@ -56,17 +61,10 @@ export function LinearApp({ onExit }: { onExit: () => void }) {
     />
   );
 
-  const exitLink = (
-    <button className={tokenStyles.compareLink} onClick={onExit}>
-      ← Back to Despatch Register
-    </button>
-  );
-
   if (view.screen === "thread") {
     const threadLetters = letters.filter((l) => l.threadKey === view.threadKey);
     return (
       <div className={tokenStyles.root}>
-        {exitLink}
         <LinearThreadScreen
           letters={threadLetters}
           initialSelectedId={view.selectedId}
@@ -79,7 +77,6 @@ export function LinearApp({ onExit }: { onExit: () => void }) {
 
   return (
     <div className={tokenStyles.root}>
-      {exitLink}
       <LinearTitleBar
         pkg={packageInfo}
         visibleCount={visible.length}
