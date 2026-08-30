@@ -41,6 +41,22 @@ table,
   color: var(--ink);
 }
 
+/* Screen-reader-only label text — present in the accessibility tree, removed from
+   visual layout. Used where a control's second half of a range (e.g. "to" in a
+   from/to pair) needs its own programmatic label without a second visible caption
+   cluttering an already-dense filter band. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :focus-visible {
   outline: 2px solid var(--locate);
   outline-offset: 1px;

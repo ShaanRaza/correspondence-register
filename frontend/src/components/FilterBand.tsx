@@ -33,15 +33,24 @@ export function FilterBand({
   return (
     <div className={styles.band}>
       <div className={styles.group}>
-        <span className={styles.label}>Dated</span>
+        <label className={styles.label} htmlFor="filter-date-from">
+          Dated
+        </label>
         <input
+          id="filter-date-from"
           type="date"
           className={styles.input}
           value={filters.dateFrom}
           onChange={(e) => set("dateFrom", e.target.value)}
         />
-        <span className={styles.dash}>–</span>
+        <span className={styles.dash} aria-hidden="true">
+          –
+        </span>
+        <label className="visually-hidden" htmlFor="filter-date-to">
+          Dated to
+        </label>
         <input
+          id="filter-date-to"
           type="date"
           className={styles.input}
           value={filters.dateTo}
@@ -50,8 +59,11 @@ export function FilterBand({
       </div>
 
       <div className={styles.group}>
-        <span className={styles.label}>Chainage (m)</span>
+        <label className={styles.label} htmlFor="filter-chainage-from">
+          Chainage (m)
+        </label>
         <input
+          id="filter-chainage-from"
           type="number"
           className={styles.input}
           style={{ width: 64 }}
@@ -59,8 +71,14 @@ export function FilterBand({
           value={filters.chainageFrom}
           onChange={(e) => set("chainageFrom", e.target.value)}
         />
-        <span className={styles.dash}>–</span>
+        <span className={styles.dash} aria-hidden="true">
+          –
+        </span>
+        <label className="visually-hidden" htmlFor="filter-chainage-to">
+          Chainage to
+        </label>
         <input
+          id="filter-chainage-to"
           type="number"
           className={styles.input}
           style={{ width: 64 }}
@@ -71,8 +89,11 @@ export function FilterBand({
       </div>
 
       <div className={styles.group}>
-        <span className={styles.label}>Direction</span>
+        <label className={styles.label} htmlFor="filter-direction">
+          Direction
+        </label>
         <select
+          id="filter-direction"
           className={styles.select}
           value={filters.direction}
           onChange={(e) => set("direction", e.target.value as Filters["direction"])}
@@ -84,8 +105,11 @@ export function FilterBand({
       </div>
 
       <div className={styles.group}>
-        <span className={styles.label}>Counterparty</span>
+        <label className={styles.label} htmlFor="filter-counterparty">
+          Counterparty
+        </label>
         <select
+          id="filter-counterparty"
           className={styles.select}
           value={filters.counterparty}
           onChange={(e) => set("counterparty", e.target.value as Filters["counterparty"])}

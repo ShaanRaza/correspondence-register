@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Letter } from "../types";
 import { formatDate } from "../lib/dates";
 import { computeGaps } from "../lib/thread";
@@ -14,9 +15,16 @@ export function Chronology({
 }) {
   const sorted = [...letters].sort((a, b) => a.serial - b.serial);
   const gaps = computeGaps(sorted);
+  const entryRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const moveSelection = (nextIndex: number) => {
+    const clamped = Math.max(0, Math.min(sorted.length - 1, nextIndex));
+    onSelect(sorted[clamped].id);
+    entryRefs.current[clamped]?.focus();
+  };
 
   return (
-    <div className={styles.list}>
+    <div className={styles.list} role="listbox" aria-label="Thread chronology">
       {sorted.map((letter, i) => {
         const gap = gaps[i];
         const isSelected = letter.id === selectedId;
@@ -32,12 +40,37 @@ export function Chronology({
               </div>
             )}
             <div
+              ref={(el) => {
+                entryRefs.current[i] = el;
+              }}
               className={`${styles.entry} ${isSelected ? styles.selected : ""}`}
               onClick={() => onSelect(letter.id)}
-              role="button"
-              tabIndex={0}
+              role="option"
+              aria-selected={isSelected}
+              aria-label={`Serial ${letter.serial}, ${letter.letterRef}, ${formatDate(letter.dated)}, ${letter.subject}`}
+              tabIndex={isSelected ? 0 : -1}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onSelect(letter.id);
+                switch (e.key) {
+                  case "Enter":
+                    onSelect(letter.id);
+                    break;
+                  case "ArrowDown":
+                    e.preventDefault();
+                    moveSelection(i + 1);
+                    break;
+                  case "ArrowUp":
+                    e.preventDefault();
+                    moveSelection(i - 1);
+                    break;
+                  case "Home":
+                    e.preventDefault();
+                    moveSelection(0);
+                    break;
+                  case "End":
+                    e.preventDefault();
+                    moveSelection(sorted.length - 1);
+                    break;
+                }
               }}
             >
               <div className={styles.entryHead}>

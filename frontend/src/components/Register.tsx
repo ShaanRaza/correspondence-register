@@ -65,18 +65,28 @@ export function Register({
   };
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.headRow}>
+    <div
+      className={styles.wrapper}
+      role="grid"
+      aria-label="Correspondence register"
+      aria-rowcount={letters.length + 1}
+    >
+      <div className={styles.headRow} role="row">
         {HEADS.map((h) => (
-          <div key={h} className={styles.headCell}>
+          <div key={h} className={styles.headCell} role="columnheader">
             {h}
           </div>
         ))}
       </div>
 
       {letters.length === 0 ? (
-        <div style={{ padding: "8px 12px", color: "var(--ink-2)", fontSize: 13 }}>
-          No documents match these filters.
+        <div role="row">
+          <div
+            role="gridcell"
+            style={{ padding: "8px 12px", color: "var(--ink-2)", fontSize: 13 }}
+          >
+            No documents match these filters.
+          </div>
         </div>
       ) : (
         letters.map((l, i) => {
@@ -90,7 +100,10 @@ export function Register({
               ref={(el) => {
                 rowRefs.current[i] = el;
               }}
-              role="button"
+              role="row"
+              aria-rowindex={i + 2}
+              aria-selected={i === focusedIndex}
+              aria-label={`Serial ${l.serial}, ${l.letterRef}, ${l.subject}. Press Enter to open thread.`}
               tabIndex={i === focusedIndex ? 0 : -1}
               onClick={() => onOpen(l)}
               onFocus={() => setFocusedIndex(i)}
@@ -119,19 +132,19 @@ export function Register({
               }}
               style={{ cursor: "pointer" }}
             >
-              <div className={`${styles.cell} ${styles.statusOuterCell}`}>
+              <div className={`${styles.cell} ${styles.statusOuterCell}`} role="gridcell">
                 <StatusCell letter={l} />
               </div>
-              <div className={`${styles.cell} ${styles.mono} ${styles.right}`}>{l.serial}</div>
-              <div className={`${styles.cell} ${styles.mono}`}>{formatDate(l.dated)}</div>
-              <div className={`${styles.cell} ${styles.mono}`}>
+              <div className={`${styles.cell} ${styles.mono} ${styles.right}`} role="gridcell">{l.serial}</div>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">{formatDate(l.dated)}</div>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">
                 {l.received ? formatDate(l.received) : <Dash />}
               </div>
-              <div className={`${styles.cell} ${styles.parties}`}>
+              <div className={`${styles.cell} ${styles.parties}`} role="gridcell">
                 {l.from} → {l.to}
               </div>
-              <div className={`${styles.cell} ${styles.mono}`}>{l.letterRef}</div>
-              <div className={`${styles.cell} ${styles.subjectCell}`}>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">{l.letterRef}</div>
+              <div className={`${styles.cell} ${styles.subjectCell}`} role="gridcell">
                 {l.subject}
                 {l.missingCitation && (
                   <span style={{ color: "var(--flag-review)", marginLeft: 6 }}>
@@ -139,14 +152,14 @@ export function Register({
                   </span>
                 )}
               </div>
-              <div className={`${styles.cell} ${styles.mono}`}>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">
                 {l.unresolvedField === "chainage" ? <Dash /> : l.chainage ?? <Dash />}
               </div>
-              <div className={`${styles.cell} ${styles.mono}`}>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">
                 {l.unresolvedField === "clause" ? <Dash /> : l.clause ?? <Dash />}
               </div>
-              <div className={`${styles.cell} ${styles.mono}`}>{l.threadKey}</div>
-              <div className={`${styles.cell} ${styles.mono} ${styles.right} ${styles.replyIn}`}>
+              <div className={`${styles.cell} ${styles.mono}`} role="gridcell">{l.threadKey}</div>
+              <div className={`${styles.cell} ${styles.mono} ${styles.right} ${styles.replyIn}`} role="gridcell">
                 {replyDays != null ? `${replyDays} d` : <Dash />}
               </div>
             </div>

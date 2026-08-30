@@ -5,11 +5,22 @@
   --ground: #e8ebee;
   --field: #ffffff;
   --field-alt: #f4f6f8;
-  --rule: #d3d9de;
-  --rule-major: #9aa5ae;
+  /* --rule / --rule-major / --ink-3 darkened from DESIGN.md's original values after
+     the audit measured them against real contrast math, not eyeballing: original
+     --rule (#D3D9DE) was 1.42:1 against --field, --rule-major (#9AA5AE) was 2.51:1 —
+     both well under WCAG 1.4.11's 3:1 floor for UI structure that carries meaning,
+     which is exactly what a register's row/column rules do. Original --ink-3
+     (#707A82) was 4.38:1 against --field and 4.04:1 against --field-alt, under the
+     4.5:1 DESIGN.md's own table claimed for it. Same hue preserved throughout —
+     these are darker steps of the same blue-grey, not a different palette.
+     Verified: --rule 3.38:1 / --rule-major 4.81:1 / --ink-3 5.21:1 vs --field
+     (4.44 / 3.12 / 4.81 vs --field-alt respectively — rule/rule-major are non-text
+     UI structure so only need 3:1; ink-3 carries text and clears 4.5:1 on both). */
+  --rule: #7c8e9d;
+  --rule-major: #66747f;
   --ink: #14181c;
   --ink-2: #5a646d;
-  --ink-3: #707a82;
+  --ink-3: #646e76;
 
   /* meaning — four colours, no fifth */
   --flag-review: #b4341f;

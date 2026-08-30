@@ -105,6 +105,7 @@ export function QueryPanel({
         <input
           autoFocus
           className={styles.input}
+          aria-label="Query the register"
           placeholder="e.g. NH-44 PKG-3, site handover, Km 12+400"
           value={text}
           onChange={(e) => setText(e.target.value)}
