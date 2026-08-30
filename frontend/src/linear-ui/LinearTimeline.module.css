@@ -107,10 +107,23 @@
 
 .gapWrap {
   position: relative;
-  height: 28px;
+  min-height: 28px;
   margin: -4px 0;
   display: flex;
   align-items: center;
+  gap: 12px;
+  padding-left: 4px;
+}
+
+/* Permanently visible, not a hover tooltip -- a number this consequential (this is
+   what an EOT claim's "which specific gap was unreasonable" argument is built from)
+   should never require a mouse-over to explain itself. The shipped despatch register
+   already gets this right (Chronology.tsx's gapEndpoints); this brings the comparison
+   UI in line with it instead of leaving the bare "19 d" ambiguous. */
+.gapCaption {
+  font-size: 11px;
+  color: var(--l-text-faint);
+  font-family: ui-monospace, "SF Mono", monospace;
 }
 
 .gapPill {

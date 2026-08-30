@@ -26,6 +26,10 @@ export function LinearTimeline({
             {gap && (
               <div className={styles.gapWrap}>
                 <span className={styles.gapPill}>{gap.days} d</span>
+                <span className={styles.gapCaption}>
+                  {gap.fromRef} ({formatDate(gap.fromDated)}) → {gap.toRef} (
+                  {formatDate(gap.toDated)})
+                </span>
               </div>
             )}
             <div className={styles.node}>

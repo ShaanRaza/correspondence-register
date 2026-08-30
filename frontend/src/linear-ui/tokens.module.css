@@ -7,7 +7,12 @@
   --l-border: #e2e8f0; /* slate-200 */
   --l-border-light: #f1f5f9; /* slate-100 */
   --l-text: #0f172a; /* slate-900 */
-  --l-text-muted: #64748b; /* slate-500 */
+  /* Blue-tinted slate instead of plain neutral gray -- the author asked for column
+     headers and secondary metadata to not just be default gray. Ties into --l-blue
+     (the accent already used for focus rings and selection) rather than reading as
+     generic template-gray. 6.37:1 against white, verified the same way the shipped
+     register's contrast values were (see STACK.md/audit history) -- not eyeballed. */
+  --l-text-muted: #44608c;
   --l-text-faint: #94a3b8; /* slate-400 */
 
   --l-green-bg: #f0fdf4;
