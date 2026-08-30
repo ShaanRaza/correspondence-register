@@ -1,0 +1,160 @@
+/* Lives inside each screen's own title block, not floated over it — a fixed-position
+   corner button collided with the register's completeness text (caught by checking
+   computed rects, not by eye) and reads as an unexplained floating action button
+   regardless. Folding it into the existing chrome fixes both. */
+.inlineTrigger {
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--locate);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--locate);
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 380px;
+  background: var(--field);
+  border-left: 1px solid var(--rule-major);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  height: 44px;
+  padding: 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule-major);
+}
+
+.label {
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.close {
+  font-family: var(--font-text);
+  font-size: 12px;
+  color: var(--locate);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inputRow {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.input {
+  width: 100%;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: var(--space-1) 0;
+}
+
+.input:focus {
+  border-bottom-color: var(--locate);
+}
+
+.hint {
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: var(--space-2);
+}
+
+.results {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+}
+
+.summaryLabel {
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: var(--space-2);
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-1) 0;
+  font-family: var(--font-value);
+  font-size: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.summaryRow:last-child {
+  border-bottom: none;
+}
+
+.summaryKey {
+  color: var(--ink-2);
+}
+
+.summaryValue {
+  color: var(--ink);
+}
+
+.hitCount {
+  font-family: var(--font-text);
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-bottom: var(--space-3);
+}
+
+.hit {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.hit:last-child {
+  border-bottom: none;
+}
+
+.hitSubject {
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.hitCitation {
+  font-family: var(--font-value);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.noMatch {
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--ink-2);
+}

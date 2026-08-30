@@ -3,6 +3,7 @@ import { TitleBlock } from "./components/TitleBlock";
 import { FilterBand, EMPTY_FILTERS, type Filters } from "./components/FilterBand";
 import { Register } from "./components/Register";
 import { ThreadScreen } from "./components/ThreadScreen";
+import { QueryPanel } from "./components/QueryPanel";
 import { letters, packageInfo } from "./data/fixtures";
 import { parseChainageMetres } from "./lib/chainage";
 import type { Letter } from "./types";
@@ -13,6 +14,7 @@ type View = { screen: "register" } | { screen: "thread"; threadKey: string; sele
 function App() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [view, setView] = useState<View>({ screen: "register" });
+  const [queryOpen, setQueryOpen] = useState(false);
 
   const visible = useMemo(() => {
     return letters.filter((l) => {
@@ -41,23 +43,43 @@ function App() {
     setView({ screen: "thread", threadKey: letter.threadKey, selectedId: letter.id });
   };
 
+  const queryPanel = (
+    <QueryPanel
+      open={queryOpen}
+      onClose={() => setQueryOpen(false)}
+      letters={letters}
+      pkg={packageInfo}
+    />
+  );
+
   if (view.screen === "thread") {
     const threadLetters = letters.filter((l) => l.threadKey === view.threadKey);
     return (
-      <ThreadScreen
-        letters={threadLetters}
-        initialSelectedId={view.selectedId}
-        onBack={() => setView({ screen: "register" })}
-      />
+      <>
+        <ThreadScreen
+          letters={threadLetters}
+          initialSelectedId={view.selectedId}
+          onBack={() => setView({ screen: "register" })}
+          onOpenQuery={() => setQueryOpen(true)}
+        />
+        {queryPanel}
+      </>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <TitleBlock pkg={packageInfo} visibleCount={visible.length} />
-      <FilterBand filters={filters} onChange={setFilters} />
-      <Register letters={visible} onOpen={openThread} />
-    </div>
+    <>
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+        <TitleBlock
+          pkg={packageInfo}
+          visibleCount={visible.length}
+          onOpenQuery={() => setQueryOpen(true)}
+        />
+        <FilterBand filters={filters} onChange={setFilters} />
+        <Register letters={visible} onOpen={openThread} />
+      </div>
+      {queryPanel}
+    </>
   );
 }
 

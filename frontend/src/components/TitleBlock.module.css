@@ -33,6 +33,12 @@
   color: var(--ink-2);
 }
 
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
 .completeness {
   font-family: var(--font-value);
   font-size: 13px;
