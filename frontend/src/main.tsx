@@ -15,10 +15,16 @@ import "@fontsource/noto-sans-mono/500.css";
 import "@fontsource/archivo/500.css";
 import "@fontsource/archivo/600.css";
 
-import App from "./App.tsx";
+// Inter, for the exploratory Linear/Stripe-style comparison UI only (#linear route).
+// The shipped despatch register never uses it.
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+
+import Root from "./Root.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 );

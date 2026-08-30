@@ -1,0 +1,89 @@
+.pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f1f5f9; /* slate-100, distinct from the app's slate-50 canvas */
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--l-surface);
+  border-bottom: 1px solid var(--l-border);
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--l-text-muted);
+}
+
+.iconButton {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--l-border);
+  border-radius: 6px;
+  background: var(--l-surface);
+  color: var(--l-text-muted);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--l-canvas);
+}
+
+.pageArea {
+  flex: 1;
+  overflow: auto;
+  padding: 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.paper {
+  width: 100%;
+  max-width: 520px;
+  height: fit-content;
+  background: var(--l-surface);
+  border-radius: 12px;
+  box-shadow: var(--l-shadow-md);
+  border: 1px solid var(--l-border-light);
+  padding: 32px;
+}
+
+.pageRef {
+  font-size: 11px;
+  color: var(--l-text-muted);
+  margin-bottom: 16px;
+}
+
+.pageSubject {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--l-text);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.pageBody {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--l-text-muted);
+}
+
+.placeholderNote {
+  margin-top: 20px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px dashed var(--l-border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--l-text-faint);
+}

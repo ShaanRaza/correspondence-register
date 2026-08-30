@@ -1,0 +1,70 @@
+.bar {
+  height: 56px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--l-surface);
+  border-bottom: 1px solid var(--l-border);
+}
+
+.left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.packageName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--l-text);
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--l-text-muted);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Segmented-control style status pill, replacing a heavy dark completeness bar */
+.segment {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 3px;
+  font-size: 12px;
+}
+
+.segmentItem {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--l-text-muted);
+}
+
+.segmentItemActive {
+  background: var(--l-surface);
+  color: var(--l-text);
+  box-shadow: var(--l-shadow-sm);
+  font-weight: 500;
+}
+
+.queryButton {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--l-text);
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.queryButton:hover {
+  background: var(--l-canvas);
+}

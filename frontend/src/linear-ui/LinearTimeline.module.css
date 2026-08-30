@@ -1,0 +1,131 @@
+.list {
+  position: relative;
+  padding: 24px 24px 24px 56px;
+}
+
+.line {
+  position: absolute;
+  left: 33px;
+  top: 24px;
+  bottom: 24px;
+  width: 2px;
+  background: var(--l-border);
+}
+
+.node {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+/* Dot centre must land exactly on the line (.line sits at 33px from .list's edge;
+   .node's own box starts at .list's content edge, 56px in, since .node has no
+   padding of its own) -- so left = 33 - 56 - (dot width / 2) = -29px. Computed, not
+   eyeballed, and confirmed against the line's actual rendered position afterward. */
+.dot {
+  position: absolute;
+  left: -29px;
+  top: 18px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--l-surface);
+  border: 2px solid var(--l-text-faint);
+}
+
+.dotSelected {
+  border-color: var(--l-blue);
+  background: var(--l-blue);
+}
+
+.card {
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.card:hover {
+  box-shadow: var(--l-shadow-sm);
+  border-color: #cbd5e1;
+}
+
+.cardSelected {
+  border-color: var(--l-blue);
+  box-shadow: 0 0 0 1px var(--l-blue);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.subject {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--l-text);
+  flex: 1;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badgeVerified {
+  background: var(--l-green-bg);
+  color: var(--l-green-text);
+  border-color: var(--l-green-border);
+}
+
+.badgeReview {
+  background: var(--l-red-bg);
+  color: var(--l-red-text);
+  border-color: var(--l-red-border);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--l-text-muted);
+}
+
+.metaRef {
+  font-family: ui-monospace, "SF Mono", monospace;
+}
+
+.gapWrap {
+  position: relative;
+  height: 28px;
+  margin: -4px 0;
+  display: flex;
+  align-items: center;
+}
+
+.gapPill {
+  /* Same alignment math as .dot, but for a translateX(-50%)-centred element:
+     centre lands at (gapWrap-origin + left) = 33px from .list's edge, so
+     left = 33 - 56 = -23px. */
+  position: absolute;
+  left: -23px;
+  transform: translateX(-50%);
+  background: #f1f5f9;
+  color: var(--l-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 9999px;
+  padding: 3px 9px;
+  border: 1px solid var(--l-border);
+  white-space: nowrap;
+}

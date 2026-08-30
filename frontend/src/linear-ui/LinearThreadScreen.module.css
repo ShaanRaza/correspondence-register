@@ -1,0 +1,61 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: var(--l-surface);
+  border-bottom: 1px solid var(--l-border);
+}
+
+.back {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--l-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-left: -8px;
+}
+
+.back:hover {
+  background: var(--l-canvas);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--l-text);
+}
+
+.threadKey {
+  font-size: 12px;
+  color: var(--l-text-muted);
+  font-family: ui-monospace, "SF Mono", monospace;
+}
+
+.split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.timelinePane {
+  width: 55%;
+  overflow-y: auto;
+  border-right: 1px solid var(--l-border);
+  background: var(--l-canvas);
+}
+
+.viewerPane {
+  width: 45%;
+  min-width: 0;
+}

@@ -1,0 +1,66 @@
+/* Comparison-only tokens. Deliberately NOT DESIGN.md's system — this is the Linear/
+   Vercel/Stripe-style alternative the user asked to see side by side, isolated to this
+   directory so it never bleeds into or replaces the shipped despatch-register UI. */
+.root {
+  --l-canvas: #f8fafc; /* slate-50 */
+  --l-surface: #ffffff;
+  --l-border: #e2e8f0; /* slate-200 */
+  --l-border-light: #f1f5f9; /* slate-100 */
+  --l-text: #0f172a; /* slate-900 */
+  --l-text-muted: #64748b; /* slate-500 */
+  --l-text-faint: #94a3b8; /* slate-400 */
+
+  --l-green-bg: #f0fdf4;
+  --l-green-text: #15803d;
+  --l-green-border: #bbf7d0;
+
+  --l-red-bg: #fef2f2;
+  --l-red-text: #b91c1c;
+  --l-red-border: #fecaca;
+
+  --l-blue: #3b82f6;
+  --l-blue-ring: rgba(59, 130, 246, 0.35);
+
+  --l-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --l-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06);
+
+  font-family: "Inter", "Noto Sans", system-ui, sans-serif;
+  background: var(--l-canvas);
+  color: var(--l-text);
+  font-size: 14px;
+  line-height: 1.5;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.root * {
+  box-sizing: border-box;
+}
+
+.root table,
+.root .mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.compareLink {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 50;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--l-text-muted);
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: var(--l-shadow-sm);
+  text-decoration: none;
+}
+
+.compareLink:hover {
+  background: var(--l-canvas);
+}

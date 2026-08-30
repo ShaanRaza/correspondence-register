@@ -1,17 +1,21 @@
 import { useMemo, useState } from "react";
-import { TitleBlock } from "./components/TitleBlock";
-import { FilterBand, EMPTY_FILTERS, type Filters } from "./components/FilterBand";
-import { Register } from "./components/Register";
-import { ThreadScreen } from "./components/ThreadScreen";
-import { QueryPanel } from "./components/QueryPanel";
-import { letters, packageInfo } from "./data/fixtures";
-import { parseChainageMetres } from "./lib/chainage";
-import type { Letter } from "./types";
-import "./styles/global.css";
+import { LinearTitleBar } from "./LinearTitleBar";
+import { LinearFilterBand } from "./LinearFilterBand";
+import { LinearRegister } from "./LinearRegister";
+import { LinearThreadScreen } from "./LinearThreadScreen";
+import { LinearQueryPanel } from "./LinearQueryPanel";
+import tokenStyles from "./tokens.module.css";
+import { EMPTY_FILTERS, type Filters } from "../components/FilterBand";
+import { letters, packageInfo } from "../data/fixtures";
+import { parseChainageMetres } from "../lib/chainage";
+import type { Letter } from "../types";
 
+// Same view-state and filtering shape as ../App.tsx (App.tsx), by design: this is a
+// visual comparison of the SAME data and behaviour, not a different product. Only
+// the components, styling, and tokens differ.
 type View = { screen: "register" } | { screen: "thread"; threadKey: string; selectedId: string };
 
-function App() {
+export function LinearApp({ onExit }: { onExit: () => void }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [view, setView] = useState<View>({ screen: "register" });
   const [queryOpen, setQueryOpen] = useState(false);
@@ -44,7 +48,7 @@ function App() {
   };
 
   const queryPanel = (
-    <QueryPanel
+    <LinearQueryPanel
       open={queryOpen}
       onClose={() => setQueryOpen(false)}
       letters={letters}
@@ -52,54 +56,38 @@ function App() {
     />
   );
 
+  const exitLink = (
+    <button className={tokenStyles.compareLink} onClick={onExit}>
+      ← Back to Despatch Register
+    </button>
+  );
+
   if (view.screen === "thread") {
     const threadLetters = letters.filter((l) => l.threadKey === view.threadKey);
     return (
-      <>
-        <ThreadScreen
+      <div className={tokenStyles.root}>
+        {exitLink}
+        <LinearThreadScreen
           letters={threadLetters}
           initialSelectedId={view.selectedId}
           onBack={() => setView({ screen: "register" })}
-          onOpenQuery={() => setQueryOpen(true)}
         />
         {queryPanel}
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-        <TitleBlock
-          pkg={packageInfo}
-          visibleCount={visible.length}
-          onOpenQuery={() => setQueryOpen(true)}
-        />
-        <FilterBand filters={filters} onChange={setFilters} />
-        <Register letters={visible} onOpen={openThread} />
-      </div>
+    <div className={tokenStyles.root}>
+      {exitLink}
+      <LinearTitleBar
+        pkg={packageInfo}
+        visibleCount={visible.length}
+        onOpenQuery={() => setQueryOpen(true)}
+      />
+      <LinearFilterBand filters={filters} onChange={setFilters} />
+      <LinearRegister letters={visible} onOpen={openThread} />
       {queryPanel}
-      {/* Exploratory comparison only, per the author's explicit "don't commit yet"
-          decision — a Linear/Stripe-style alternative to look at side by side, not a
-          change to this screen. Deliberately minimal so it reads as a dev/meta
-          control, not a product feature. */}
-      <a
-        href="#linear"
-        style={{
-          position: "fixed",
-          bottom: 12,
-          left: 16,
-          fontFamily: "var(--font-text)",
-          fontSize: 11,
-          color: "var(--ink-3)",
-          textDecoration: "underline",
-          textUnderlineOffset: 2,
-        }}
-      >
-        Compare: Linear-style UI →
-      </a>
-    </>
+    </div>
   );
 }
-
-export default App;
