@@ -4,8 +4,10 @@ import { LinearFilterBand } from "./LinearFilterBand";
 import { LinearRegister } from "./LinearRegister";
 import { LinearThreadScreen } from "./LinearThreadScreen";
 import { LinearQueryPanel } from "./LinearQueryPanel";
+import { LinearUploadPanel } from "./LinearUploadPanel";
 import tokenStyles from "./tokens.module.css";
 import { EMPTY_FILTERS, type Filters } from "../components/FilterBand";
+import { runQuery, type QueryResult } from "../lib/query";
 import { letters, packageInfo } from "../data/fixtures";
 import { parseChainageMetres } from "../lib/chainage";
 import type { Letter } from "../types";
@@ -23,7 +25,11 @@ type View = { screen: "register" } | { screen: "thread"; threadKey: string; sele
 export function LinearApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [view, setView] = useState<View>({ screen: "register" });
-  const [queryOpen, setQueryOpen] = useState(false);
+
+  const [queryText, setQueryText] = useState("");
+  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
+  const [queryPanelOpen, setQueryPanelOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const visible = useMemo(() => {
     return letters.filter((l) => {
@@ -52,13 +58,20 @@ export function LinearApp() {
     setView({ screen: "thread", threadKey: letter.threadKey, selectedId: letter.id });
   };
 
-  const queryPanel = (
-    <LinearQueryPanel
-      open={queryOpen}
-      onClose={() => setQueryOpen(false)}
-      letters={letters}
-      pkg={packageInfo}
-    />
+  const submitQuery = () => {
+    setQueryResult(runQuery(queryText, letters, packageInfo));
+    setQueryPanelOpen(true);
+  };
+
+  const overlays = (
+    <>
+      <LinearQueryPanel
+        open={queryPanelOpen}
+        onClose={() => setQueryPanelOpen(false)}
+        result={queryResult}
+      />
+      <LinearUploadPanel open={uploadOpen} onClose={() => setUploadOpen(false)} />
+    </>
   );
 
   if (view.screen === "thread") {
@@ -70,7 +83,7 @@ export function LinearApp() {
           initialSelectedId={view.selectedId}
           onBack={() => setView({ screen: "register" })}
         />
-        {queryPanel}
+        {overlays}
       </div>
     );
   }
@@ -80,11 +93,14 @@ export function LinearApp() {
       <LinearTitleBar
         pkg={packageInfo}
         visibleCount={visible.length}
-        onOpenQuery={() => setQueryOpen(true)}
+        queryText={queryText}
+        onQueryTextChange={setQueryText}
+        onSubmitQuery={submitQuery}
+        onOpenUpload={() => setUploadOpen(true)}
       />
       <LinearFilterBand filters={filters} onChange={setFilters} />
       <LinearRegister letters={visible} onOpen={openThread} />
-      {queryPanel}
+      {overlays}
     </div>
   );
 }

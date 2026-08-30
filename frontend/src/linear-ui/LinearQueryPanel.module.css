@@ -40,28 +40,6 @@
   background: var(--l-canvas);
 }
 
-.inputRow {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--l-border);
-}
-
-.input {
-  width: 100%;
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--l-text);
-  background: var(--l-surface);
-  border: 1px solid var(--l-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  outline: none;
-}
-
-.input:focus {
-  border-color: transparent;
-  box-shadow: 0 0 0 2px var(--l-blue-ring);
-}
-
 .hint {
   font-size: 12px;
   color: var(--l-text-faint);

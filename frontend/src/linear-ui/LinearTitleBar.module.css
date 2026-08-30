@@ -9,6 +9,7 @@
   justify-content: space-between;
   background: var(--l-bar-bg);
   flex-shrink: 0;
+  gap: 24px;
 }
 
 .left {
@@ -16,6 +17,7 @@
   align-items: baseline;
   gap: 12px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .packageName {
@@ -34,8 +36,50 @@
 .right {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+/* The search bar itself -- given real width and a light-on-dark treatment so it
+   reads as the most prominent interactive element in the header, not an
+   afterthought button. */
+.searchWrap {
+  position: relative;
+  flex: 1;
+  max-width: 420px;
+  min-width: 160px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--l-bar-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--l-bar-text);
+  background: rgba(248, 250, 252, 0.08);
+  border: 1px solid var(--l-bar-border);
+  border-radius: 8px;
+  padding: 8px 12px 8px 32px;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--l-bar-text-muted);
+}
+
+.searchInput:focus {
+  background: rgba(248, 250, 252, 0.14);
+  border-color: var(--l-bar-accent);
 }
 
 .segment {
@@ -46,6 +90,7 @@
   padding: 3px;
   font-size: 12px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .segmentItem {
@@ -60,18 +105,19 @@
   font-weight: 500;
 }
 
-.queryButton {
+.uploadButton {
   font-size: 12px;
   font-weight: 500;
-  color: var(--l-bar-text);
-  background: transparent;
-  border: 1px solid var(--l-bar-border);
+  color: var(--l-bar-bg);
+  background: var(--l-bar-text);
+  border: 1px solid var(--l-bar-text);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.queryButton:hover {
-  background: var(--l-bar-pill-bg);
+.uploadButton:hover {
+  opacity: 0.9;
 }

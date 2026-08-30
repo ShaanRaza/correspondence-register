@@ -1,11 +1,11 @@
-import { useState } from "react";
-import type { Letter, PackageInfo } from "../types";
-import { runQuery, type QueryResult } from "../lib/query";
+import type { QueryResult } from "../lib/query";
 import { formatDate } from "../lib/dates";
 import styles from "./LinearQueryPanel.module.css";
 
 // Same deterministic, cited retrieval as the shipped QueryPanel (lib/query.ts,
-// unchanged) — restyled only.
+// unchanged) — restyled only. The search input itself now lives in LinearTitleBar,
+// always visible, rather than hidden inside this panel behind a click — this
+// component is purely the results display now.
 function ResultView({ result }: { result: QueryResult | null }) {
   if (result === null) {
     return (
@@ -79,39 +79,21 @@ function ResultView({ result }: { result: QueryResult | null }) {
 export function LinearQueryPanel({
   open,
   onClose,
-  letters,
-  pkg,
+  result,
 }: {
   open: boolean;
   onClose: () => void;
-  letters: Letter[];
-  pkg: PackageInfo;
+  result: QueryResult | null;
 }) {
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<QueryResult | null>(null);
-
   if (!open) return null;
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <span className={styles.title}>Query</span>
+        <span className={styles.title}>Search results</span>
         <button className={styles.close} onClick={onClose}>
           Close
         </button>
-      </div>
-      <div className={styles.inputRow}>
-        <input
-          autoFocus
-          className={styles.input}
-          aria-label="Query the register"
-          placeholder="e.g. NH-44 PKG-3, site handover, Km 12+400"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") setResult(runQuery(text, letters, pkg));
-          }}
-        />
       </div>
       <div className={styles.results}>
         <ResultView result={result} />
