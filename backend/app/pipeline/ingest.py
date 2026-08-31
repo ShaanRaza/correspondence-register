@@ -28,7 +28,7 @@ from .extract import extract_document
 from .link import recompute_threads, resolve_citations
 from .ocr import OcrPage, recognize_page
 from .provenance import map_span_to_bbox
-from .rasterize import rasterize_pdf
+from .rasterize import get_page_count, rasterize_page
 from .storage import LocalBlobStore, original_key, raster_key, sha256_hex
 from .validate import validate_verbatim
 
@@ -131,12 +131,13 @@ def ingest_pdf(
         if cur.fetchone() is not None:
             return IngestResult(sha256, True, None, [], error=None)
 
-    # --- S1: rasterize ---
-    pages = rasterize_pdf(pdf_bytes)
-
-    # --- S2: OCR every page ---
+    # --- S1 + S2: rasterize and OCR one page at a time -- keeping every page's
+    # decoded image in memory at once (the previous approach) is what OOM-killed
+    # a real request on a memory-constrained deployment. See rasterize.py.
+    page_count = get_page_count(pdf_bytes)
     ocr_pages: dict[int, OcrPage] = {}
-    for page in pages:
+    for page_no in range(1, page_count + 1):
+        page = rasterize_page(pdf_bytes, page_no)
         raster_bytes = page.png_bytes()
         key = raster_key(PIPELINE_VERSION_ID, sha256, page.page_no)
         if not store.exists(key):
