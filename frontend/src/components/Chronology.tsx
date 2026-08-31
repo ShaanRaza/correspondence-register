@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { Letter } from "../types";
 import { formatDate } from "../lib/dates";
-import { computeGaps } from "../lib/thread";
+import { computeGaps, sortChronologically } from "../lib/thread";
 import styles from "./Chronology.module.css";
 
 export function Chronology({
@@ -13,7 +13,7 @@ export function Chronology({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
-  const sorted = [...letters].sort((a, b) => a.serial - b.serial);
+  const sorted = sortChronologically(letters);
   const gaps = computeGaps(sorted);
   const entryRefs = useRef<(HTMLDivElement | null)[]>([]);
 
