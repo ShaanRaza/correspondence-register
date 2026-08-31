@@ -1,5 +1,12 @@
 FROM python:3.11-slim
 
+# Without this, Python block-buffers stdout/stderr when it isn't a TTY (true of
+# any container) -- exception tracebacks from a failed request can be delayed
+# or never flushed, showing only a bare "500" in the platform's logs with no
+# way to see why. Confirmed the hard way: every upload 500'd with zero
+# traceback in Render's logs until this was set.
+ENV PYTHONUNBUFFERED=1
+
 # Tesseract (+ Hindi/Devanagari pack, since correspondence mixes English and
 # Hindi on the same line) and poppler-utils (pdftoppm, used to rasterize PDF
 # pages) -- a plain Python buildpack has neither, and this pipeline needs both.
