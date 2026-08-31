@@ -15,6 +15,7 @@ unless a new citation actually connects it to something else.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 
 import psycopg
@@ -23,6 +24,34 @@ import psycopg
 def normalize_ref(ref: str) -> str:
     ref = unicodedata.normalize("NFC", ref)
     return " ".join(ref.split()).upper()
+
+
+# SQL fragment stripping a reference down to letters and digits only, so two
+# spellings of the SAME reference ("No. PW/CE/NH/22/2018/Pt/47" vs
+# "PW-CE-NH-22-2018-PT-47") compare equal. Deliberately NOT similarity: every
+# character that survives must still match exactly, so two references that
+# differ only in their trailing serial -- 295 vs 367, 61 vs 66 -- remain
+# distinct. Real data showed those scoring 64-68% on trigram similarity purely
+# because they share a long identical prefix, which is exactly why a percentage
+# threshold cannot be used to auto-link an evidentiary register.
+#
+# A leading "No."/"NO." is also dropped: it is the word "Number", a label
+# attached inconsistently across these documents ("No. PW/CE/..." vs
+# "PW/CE/..."), not part of the identifier. A separator (period or whitespace)
+# is REQUIRED after it so a reference that genuinely begins with those letters
+# -- NOIDA/... -- is left alone.
+_ALNUM_SQL = (
+    "upper(regexp_replace("
+    "regexp_replace(upper({col}), '^NO[.[:space:]]+', ''), "
+    "'[^A-Za-z0-9]', '', 'g'))"
+)
+
+_NO_PREFIX = re.compile(r"^NO[.\s]+")
+
+
+def strip_to_alnum(ref: str) -> str:
+    stripped = _NO_PREFIX.sub("", ref.upper())
+    return "".join(ch for ch in stripped if ch.isalnum())
 
 
 def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_id: str) -> None:
@@ -58,6 +87,25 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
             )
             matches = [row[0] for row in cur.fetchall()]
             fuzzy_candidates: list[tuple] = []  # (letter_id, score) -- only used when no exact match
+
+            # Second pass before falling back to fuzzy: the same reference written
+            # with different punctuation/spacing/case is still the same reference.
+            # Only run when the strict comparison found nothing, and only accept a
+            # single unambiguous hit -- if two letters collapse to the same
+            # alphanumeric string, that is genuinely ambiguous and goes to review.
+            if not matches:
+                cur.execute(
+                    f"""
+                    SELECT id FROM letters
+                    WHERE package_id = %s AND is_current AND id != %s
+                          AND letter_ref_normalized IS NOT NULL
+                          AND {_ALNUM_SQL.format(col='letter_ref_normalized')} = %s
+                    """,
+                    (package_id, citing_letter_id, strip_to_alnum(ref_normalized)),
+                )
+                alnum_matches = [row[0] for row in cur.fetchall()]
+                if len(alnum_matches) == 1:
+                    matches = alnum_matches
 
             if len(matches) == 1:
                 resolution, cited_letter_id = "resolved", matches[0]

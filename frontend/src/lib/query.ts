@@ -21,6 +21,8 @@ export interface PackageSummaryResult {
 export interface LetterHit {
   letter: Letter;
   matchedOn: string[];
+  /** True when one field contains the whole query as a contiguous phrase. */
+  phraseHit?: boolean;
 }
 
 export interface LetterMatchesResult {
@@ -69,21 +71,45 @@ export function runQuery(rawQuery: string, letters: Letter[], pkg: PackageInfo):
       clause: letter.clause ?? "",
       parties: `${letter.from} ${letter.to}`,
       dated: formatDate(letter.dated),
+      // Searching by the uploaded file's name previously matched nothing at
+      // all: the filename was never returned by the API, let alone searched.
+      // Same for the thread key, which made threads unfindable by name.
+      thread: letter.threadKey,
+      "source file": letter.originalFilename ?? "",
     };
 
-    const matchedOn: string[] = [];
-    for (const [fieldName, value] of Object.entries(fields)) {
-      const normValue = normalize(value);
-      if (words.some((w) => normValue.includes(w))) {
-        matchedOn.push(fieldName);
-      }
-    }
+    const entries = Object.entries(fields).map(
+      ([name, value]) => [name, normalize(value)] as const,
+    );
 
-    if (matchedOn.length > 0) hits.push({ letter, matchedOn });
+    // EVERY word must appear somewhere in the letter, not just one of them.
+    // Matching on any single word made the search useless in practice: a query
+    // like "Shifting of Box Culvert" matched 15 of 16 letters, because the word
+    // "of" occurs in nearly every subject line. Requiring all words is what a
+    // search box is expected to do, and it is what makes a filename or a
+    // multi-word subject phrase actually narrow the register down.
+    const everyWordFound = words.every((w) =>
+      entries.some(([, value]) => value.includes(w)),
+    );
+    if (!everyWordFound) continue;
+
+    const matchedOn = entries
+      .filter(([, value]) => words.some((w) => value.includes(w)))
+      .map(([name]) => name);
+
+    // A field containing the entire query as one phrase is a stronger signal
+    // than the same words scattered across different fields; used for ranking.
+    const phraseHit = entries.some(([, value]) => value.includes(query));
+    hits.push({ letter, matchedOn, phraseHit });
   }
 
   if (hits.length === 0) return { kind: "no_match", query: rawQuery };
 
-  hits.sort((a, b) => b.matchedOn.length - a.matchedOn.length || a.letter.serial - b.letter.serial);
+  hits.sort(
+    (a, b) =>
+      Number(b.phraseHit ?? false) - Number(a.phraseHit ?? false) ||
+      b.matchedOn.length - a.matchedOn.length ||
+      a.letter.serial - b.letter.serial,
+  );
   return { kind: "letter_matches", query: rawQuery, hits };
 }

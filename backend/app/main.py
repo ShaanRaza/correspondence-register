@@ -214,11 +214,13 @@ def list_letters(package_id: str) -> list[dict]:
             SELECT l.id, l.serial, l.letter_ref, l.dated, l.received,
                    fp.short_code, tp.short_code, l.direction,
                    l.subject, l.review_status, t.thread_key,
-                   l.document_sha256, l.page_from, l.page_to
+                   l.document_sha256, l.page_from, l.page_to,
+                   d.original_filename
             FROM letters l
             LEFT JOIN parties fp ON fp.id = l.from_party_id
             LEFT JOIN parties tp ON tp.id = l.to_party_id
             LEFT JOIN threads t ON t.id = l.thread_id
+            LEFT JOIN documents d ON d.sha256 = l.document_sha256
             WHERE l.package_id = %s AND l.is_current
             ORDER BY l.serial
             """,
@@ -258,7 +260,7 @@ def list_letters(package_id: str) -> list[dict]:
     results = []
     for (letter_id, serial, letter_ref, dated, received, from_code, to_code,
          direction, subject, review_status, thread_key,
-         document_sha256, page_from, page_to) in rows:
+         document_sha256, page_from, page_to, original_filename) in rows:
         lid = str(letter_id)
         unresolved = "parties" if direction is None else None
         results.append(
@@ -283,6 +285,7 @@ def list_letters(package_id: str) -> list[dict]:
                 "documentSha256": document_sha256,
                 "pageFrom": page_from,
                 "pageTo": page_to,
+                "originalFilename": original_filename,
             }
         )
     return results

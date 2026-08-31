@@ -28,6 +28,10 @@ export interface Letter {
   documentSha256?: string;
   pageFrom?: number;
   pageTo?: number;
+  /** The uploaded file this letter came from. Present for live letters only;
+   * searchable, because "which letter came from this PDF?" is a question people
+   * actually ask when reconciling a register against a folder of scans. */
+  originalFilename?: string;
 }
 
 export type FieldValidation = "exact" | "normalized_exact" | "unresolved";
