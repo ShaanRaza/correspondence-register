@@ -17,6 +17,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, Response, Uploa
 from google import genai
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .pipeline.ingest import IngestResult, ingest_pdf
@@ -73,6 +74,43 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+def _ingest_blocking(
+    *,
+    settings,
+    package_id: str,
+    pdf_bytes: bytes,
+    original_filename: str,
+    gemini_api_key: str,
+) -> IngestResult:
+    """Every blocking step of an ingest, isolated so it can be handed to a
+    threadpool. HTTPExceptions raised here propagate out of run_in_threadpool
+    normally and are handled by FastAPI exactly as if raised inline."""
+    store = LocalBlobStore(settings.storage_root)
+    client = genai.Client(api_key=gemini_api_key)
+
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM packages WHERE id = %s", (package_id,))
+            if cur.fetchone() is None:
+                raise HTTPException(status_code=404, detail=f"Unknown package_id {package_id!r}")
+
+        try:
+            return ingest_pdf(
+                conn,
+                store,
+                client,
+                package_id=package_id,
+                pdf_bytes=pdf_bytes,
+                original_filename=original_filename,
+                contract_conditions=DEFAULT_CONTRACT_CONDITIONS,
+                package_context=DEFAULT_PACKAGE_CONTEXT,
+            )
+        except AssertionError as e:
+            # The OCR offset invariant failing is a real, actionable pipeline bug --
+            # surface it plainly rather than a generic 500.
+            raise HTTPException(status_code=500, detail=f"OCR invariant violation: {e}") from e
+
+
 @app.post("/api/packages/{package_id}/documents")
 async def upload_document(
     package_id: str,
@@ -99,30 +137,24 @@ async def upload_document(
         )
 
     pdf_bytes = await file.read()
-    store = LocalBlobStore(settings.storage_root)
-    client = genai.Client(api_key=effective_key)
 
-    with psycopg.connect(settings.database_url) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM packages WHERE id = %s", (package_id,))
-            if cur.fetchone() is None:
-                raise HTTPException(status_code=404, detail=f"Unknown package_id {package_id!r}")
-
-        try:
-            result: IngestResult = ingest_pdf(
-                conn,
-                store,
-                client,
-                package_id=package_id,
-                pdf_bytes=pdf_bytes,
-                original_filename=file.filename,
-                contract_conditions=DEFAULT_CONTRACT_CONDITIONS,
-                package_context=DEFAULT_PACKAGE_CONTEXT,
-            )
-        except AssertionError as e:
-            # The OCR offset invariant failing is a real, actionable pipeline bug --
-            # surface it plainly rather than a generic 500.
-            raise HTTPException(status_code=500, detail=f"OCR invariant violation: {e}") from e
+    # Off the event loop, not on it. ingest_pdf() is entirely blocking work --
+    # poppler and tesseract subprocesses, a synchronous Gemini HTTP call, and
+    # psycopg queries -- and running it directly inside `async def` froze the
+    # single uvicorn worker (Render sets WEB_CONCURRENCY=1 on a 0.1-CPU
+    # instance) for the whole ingest. Nothing else could be served meanwhile,
+    # including the platform's own health checks, so the service was killed and
+    # restarted mid-upload: every request 500'd or hung and the site appeared
+    # down. Confirmed from logs -- an upload POST logged no response at all,
+    # followed by a service restart. A threadpool keeps the loop free.
+    result: IngestResult = await run_in_threadpool(
+        _ingest_blocking,
+        settings=settings,
+        package_id=package_id,
+        pdf_bytes=pdf_bytes,
+        original_filename=file.filename,
+        gemini_api_key=effective_key,
+    )
 
     if result.error:
         raise HTTPException(status_code=502, detail=f"Extraction failed: {result.error}")

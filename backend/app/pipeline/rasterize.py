@@ -15,13 +15,26 @@ regardless of document length.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from io import BytesIO
 
 from pdf2image import convert_from_bytes, pdfinfo_from_bytes
 from PIL import Image
 
-DPI = 300
+# 300 DPI is the standard recommendation for document OCR and stays the default
+# (local runs, and any host with real CPU/RAM, should use it). It is overridable
+# because rendering cost scales with the square of DPI: on a 0.1-CPU / 512MB
+# free-tier container, 300 DPI OCR of a full page is slow enough to be
+# impractical, and 200 DPI cuts pixel count -- so both memory and tesseract CPU
+# time -- by ~56%. That IS an accuracy tradeoff on small or poor-quality print,
+# so it is opt-in per deployment rather than lowered for everyone.
+DPI = int(os.environ.get("RASTER_DPI", "300"))
+
+# Grayscale rather than RGB: a third of the decoded image memory for scans of
+# black-and-white correspondence, and no OCR accuracy cost -- tesseract
+# binarizes internally regardless of how many channels it is handed.
+GRAYSCALE = os.environ.get("RASTER_GRAYSCALE", "1") == "1"
 
 
 @dataclass(frozen=True)
@@ -46,6 +59,8 @@ def rasterize_page(pdf_bytes: bytes, page_no: int) -> Page:
     call -- pdf2image/poppler don't expose a way to keep a decoded document
     open across calls, so this trades a small amount of repeated parsing
     overhead for the memory bound described above."""
-    images = convert_from_bytes(pdf_bytes, dpi=DPI, first_page=page_no, last_page=page_no)
+    images = convert_from_bytes(
+        pdf_bytes, dpi=DPI, first_page=page_no, last_page=page_no, grayscale=GRAYSCALE
+    )
     img = images[0]
     return Page(page_no=page_no, image=img, width_px=img.width, height_px=img.height)
