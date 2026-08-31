@@ -38,7 +38,17 @@ async def require_app_password(request: Request, call_next):
     """Shared-password gate for when this is deployed somewhere reachable by
     more than just you -- there is no real user model here, this only stops a
     random link-holder from touching an exposed instance. A no-op locally
-    (APP_PASSWORD unset means the gate is off, which is the default)."""
+    (APP_PASSWORD unset means the gate is off, which is the default).
+
+    `@app.middleware("http")` registers AFTER CORSMiddleware but runs BEFORE it
+    on the way in (Starlette wraps middleware in reverse-registration order) --
+    this must let OPTIONS preflight through untouched, or a browser's preflight
+    gets a 401 with no Access-Control-Allow-Origin header at all and the real
+    request never gets sent. Preflight carries no custom headers by design, so
+    there's nothing to check here anyway; CORSMiddleware's own allow_origins
+    still gates who the browser lets the real request return a response to."""
+    if request.method == "OPTIONS":
+        return await call_next(request)
     settings = get_settings()
     if not settings.app_password or request.url.path in ("/api/health", "/docs", "/openapi.json"):
         return await call_next(request)
