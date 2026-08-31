@@ -3,10 +3,12 @@ import type { ExtractedFieldProvenance, Letter, PackageInfo } from "../types";
 // The package seeded by `backend/scripts/seed_upload_package.py` for real uploaded
 // documents to ingest against -- deliberately not the fictional "NH-44 PKG-3" used
 // in the design fixtures, so real evidence is never silently blended with sample data.
-export const UPLOAD_PACKAGE_ID = "51299903-aec7-43c6-9ad0-cc2043578a0d";
+// Overridable per deployment: each deployed backend has its own fresh database
+// with its own seeded package_id, distinct from your local one.
+export const UPLOAD_PACKAGE_ID = import.meta.env.VITE_UPLOAD_PACKAGE_ID || "51299903-aec7-43c6-9ad0-cc2043578a0d";
 
-// Configurable per deployment (Vercel sets VITE_API_BASE to the Railway backend's
-// public URL); defaults to local dev.
+// Configurable per deployment (Vercel sets VITE_API_BASE to the deployed
+// backend's public URL); defaults to local dev.
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 // Shared-password gate (see backend/app/main.py's `require_app_password`
