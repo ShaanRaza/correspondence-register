@@ -7,3 +7,10 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.pytest_cache/
 backend/*.egg-info/
+# Real credentials never get committed. .env.example (no real key) is the only
+# tracked template; backend/.env (or any .env variant) is where a real
+# ANTHROPIC_API_KEY actually lives, entered by the user directly, never by Claude.
+.env
+.env.*
+!.env.example
+backend/storage/

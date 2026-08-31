@@ -1,6 +1,6 @@
 export type Direction = "inward" | "outward";
 export type ReviewStatus = "unverified" | "needs_review" | "verified";
-export type PartyCode = "CTR" | "AE" | "PD";
+export type PartyCode = "CTR" | "AE" | "PD" | "UNK";
 
 export interface Letter {
   id: string;
@@ -22,6 +22,24 @@ export interface Letter {
   unresolvedField?: string;
   /** A reference this letter cites that the register does not hold. */
   missingCitation?: string;
+  /** Present only for live (real-uploaded) letters -- fixture letters have no
+   * real source document behind them, so the viewer falls back to its honest
+   * placeholder when these are absent. */
+  documentSha256?: string;
+  pageFrom?: number;
+  pageTo?: number;
+}
+
+export type FieldValidation = "exact" | "normalized_exact" | "unresolved";
+
+export interface ExtractedFieldProvenance {
+  fieldKey: string;
+  fieldIndex: number;
+  valueText: string | null;
+  valueVerbatim: string | null;
+  pageNo: number | null;
+  bbox: { union: { x: number; y: number; w: number; h: number } } | null;
+  validation: FieldValidation;
 }
 
 export interface PackageInfo {

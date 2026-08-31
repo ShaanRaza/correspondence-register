@@ -80,7 +80,7 @@ export function LinearRegister({
                     {l.received ? formatDate(l.received) : "—"}
                   </td>
                   <td className={`${styles.td} ${styles.tdMuted}`}>
-                    {l.from} → {l.to}
+                    {l.unresolvedField === "parties" ? "—" : `${l.from} → ${l.to}`}
                   </td>
                   <td className={styles.td}>{l.letterRef}</td>
                   <td className={styles.td}>

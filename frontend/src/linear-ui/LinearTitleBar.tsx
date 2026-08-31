@@ -9,6 +9,9 @@ export function LinearTitleBar({
   onQueryTextChange,
   onSubmitQuery,
   onOpenUpload,
+  uploadStatus,
+  onOpenReview,
+  reviewCount,
 }: {
   pkg: PackageInfo;
   visibleCount: number;
@@ -16,16 +19,22 @@ export function LinearTitleBar({
   onQueryTextChange: (text: string) => void;
   onSubmitQuery: () => void;
   onOpenUpload: () => void;
+  uploadStatus?: string | null;
+  onOpenReview?: () => void;
+  reviewCount?: number;
 }) {
   return (
     <div className={styles.bar}>
       <div className={styles.left}>
         <span className={styles.packageName}>{pkg.name}</span>
         <span className={styles.meta}>{pkg.contractNo}</span>
-        <span className={styles.meta}>
-          {formatDate(pkg.periodFrom)} – {formatDate(pkg.periodTo)}
-        </span>
+        {pkg.periodFrom && pkg.periodTo && (
+          <span className={`${styles.meta} ${styles.metaSecondary}`}>
+            {formatDate(pkg.periodFrom)} – {formatDate(pkg.periodTo)}
+          </span>
+        )}
       </div>
+      {uploadStatus && <div className={styles.uploadStatus}>{uploadStatus}</div>}
       <div className={styles.right}>
         {/* Search lives directly in the bar, always visible -- not behind a small
            button that opens a hidden panel. The author felt the query feature
@@ -51,8 +60,15 @@ export function LinearTitleBar({
           <span className={`${styles.segmentItem} ${styles.segmentItemActive}`}>
             {pkg.documentsIngested} of {pkg.documentsTotal} ingested
           </span>
-          <span className={styles.segmentItem}>{visibleCount} shown</span>
+          <span className={`${styles.segmentItem} ${styles.segmentItemSecondary}`}>
+            {visibleCount} shown
+          </span>
         </div>
+        {onOpenReview && !!reviewCount && (
+          <button className={styles.uploadButton} onClick={onOpenReview}>
+            Review ({reviewCount})
+          </button>
+        )}
         <button className={styles.uploadButton} onClick={onOpenUpload}>
           Upload
         </button>

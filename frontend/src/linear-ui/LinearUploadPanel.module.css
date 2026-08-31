@@ -1,15 +1,25 @@
-.panel {
+.backdrop {
   position: fixed;
-  top: 0;
-  right: 0;
-  height: 100vh;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel {
   width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
   background: var(--l-surface);
-  border-left: 1px solid var(--l-border);
+  border: 1px solid var(--l-border);
+  border-radius: 12px;
   box-shadow: var(--l-shadow-md);
   z-index: 20;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .header {
@@ -40,8 +50,18 @@
   background: var(--l-canvas);
 }
 
+.close:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.close:disabled:hover {
+  background: none;
+}
+
 .body {
   padding: 20px;
+  overflow-y: auto;
 }
 
 .dropzone {
@@ -63,10 +83,75 @@
 .note {
   margin-top: 16px;
   padding: 12px 14px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--l-canvas);
+  border: 1px solid var(--l-border);
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.5;
-  color: #92400e;
+  color: var(--l-text-muted);
+}
+
+.apiKeyBlock {
+  margin-top: 16px;
+}
+
+.apiKeyLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--l-text);
+  margin-bottom: 6px;
+}
+
+.apiKeyOptional {
+  font-weight: 400;
+  color: var(--l-text-faint);
+}
+
+.apiKeyRow {
+  display: flex;
+  gap: 6px;
+}
+
+.apiKeyInput {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--l-border);
+  border-radius: 6px;
+  background: var(--l-surface);
+  color: var(--l-text);
+}
+
+.apiKeyInput:focus {
+  outline: none;
+  border-color: var(--l-blue, #3b82f6);
+}
+
+.apiKeyToggle {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--l-text-muted);
+  background: var(--l-canvas);
+  border: 1px solid var(--l-border);
+  border-radius: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.apiKeyToggle:hover {
+  background: var(--l-border-light);
+}
+
+.apiKeyHint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--l-text-faint);
+}
+
+.apiKeyHint a {
+  color: var(--l-blue, #3b82f6);
 }

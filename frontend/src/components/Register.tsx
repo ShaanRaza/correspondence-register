@@ -141,7 +141,7 @@ export function Register({
                 {l.received ? formatDate(l.received) : <Dash />}
               </div>
               <div className={`${styles.cell} ${styles.parties}`} role="gridcell">
-                {l.from} → {l.to}
+                {l.unresolvedField === "parties" ? <Dash /> : `${l.from} → ${l.to}`}
               </div>
               <div className={`${styles.cell} ${styles.mono}`} role="gridcell">{l.letterRef}</div>
               <div className={`${styles.cell} ${styles.subjectCell}`} role="gridcell">

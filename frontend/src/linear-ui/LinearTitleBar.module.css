@@ -33,6 +33,33 @@
   white-space: nowrap;
 }
 
+/* Secondary info -- essential is just package name + contract no. Hidden below a
+   real breakpoint rather than left to fight for space with the search box, which
+   was the actual cause of the overlap: flex-shrink math with several nowrap
+   siblings doesn't converge cleanly at narrow widths, a hard cutoff does. */
+@media (max-width: 900px) {
+  .metaSecondary {
+    display: none;
+  }
+}
+
+.uploadStatus {
+  font-size: 12px;
+  color: var(--l-bar-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .uploadStatus {
+    display: none;
+  }
+}
+
 .right {
   display: flex;
   align-items: center;
@@ -49,7 +76,7 @@
   position: relative;
   flex: 1;
   max-width: 420px;
-  min-width: 160px;
+  min-width: 120px;
 }
 
 .searchIcon {
@@ -103,6 +130,12 @@
   background: var(--l-bar-pill-active-bg);
   color: var(--l-bar-text);
   font-weight: 500;
+}
+
+@media (max-width: 760px) {
+  .segmentItemSecondary {
+    display: none;
+  }
 }
 
 .uploadButton {

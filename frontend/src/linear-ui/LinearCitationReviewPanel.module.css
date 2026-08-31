@@ -1,0 +1,128 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: 12px;
+  box-shadow: var(--l-shadow-md);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--l-border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--l-text);
+}
+
+.close {
+  font-size: 12px;
+  color: var(--l-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.close:hover {
+  background: var(--l-canvas);
+}
+
+.body {
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--l-text-faint);
+  font-size: 13px;
+}
+
+.item {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--l-border-light);
+}
+
+.itemHead {
+  font-size: 12px;
+  color: var(--l-text-muted);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.itemHead b {
+  color: var(--l-text);
+  font-weight: 600;
+}
+
+.candidateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--l-border);
+  border-radius: 8px;
+  margin-top: 6px;
+  background: var(--l-canvas);
+}
+
+.candidateInfo {
+  flex: 1;
+  font-size: 12px;
+  color: var(--l-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidateScore {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--l-text-faint);
+}
+
+.confirmButton {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--l-blue, #3b82f6);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.confirmButton:hover {
+  opacity: 0.9;
+}
+
+.confirmButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
