@@ -25,7 +25,7 @@ import psycopg
 from openai import OpenAI
 
 from .extract import MODEL as EXTRACTION_MODEL, extract_document
-from .link import recompute_threads, resolve_citations
+from .link import choose_ref, recompute_threads, resolve_citations
 from .ocr import OcrPage, recognize_page
 from .provenance import map_span_to_bbox
 from .rasterize import get_page_count, rasterize_page
@@ -253,14 +253,9 @@ def ingest_pdf(
     candidates = []
     for raw in raw_letters:
         ref_field = raw.get("letter_ref") or {}
-        # verbatim, not value: value is the model's own free-form re-typing of the
-        # reference with no check against the source text, and real data showed it
-        # silently dropping/inserting characters ("PYN" -> "PY N", "2025/6" ->
-        # "2025/61") even when the verbatim (validated, highlighted) text was
-        # correct. A reference number is an identifier, not something that
-        # benefits from "normalization" -- the literal printed text is the
-        # correct value, and it's the one S4 already proved exists in the source.
-        ref_verbatim = ref_field.get("verbatim") or ref_field.get("value")
+        # See choose_ref(): the tight `value` when it is contained in the
+        # validated `verbatim` span, otherwise the verbatim itself.
+        ref_verbatim = choose_ref(ref_field)
         candidates.append(
             {
                 "raw": raw,

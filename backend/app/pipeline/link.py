@@ -54,6 +54,48 @@ def strip_to_alnum(ref: str) -> str:
     return "".join(ch for ch in stripped if ch.isalnum())
 
 
+def _squash(s: str) -> str:
+    return "".join(s.split()).upper()
+
+
+def choose_ref(field: dict | None) -> str | None:
+    """Pick the reference string to STORE and MATCH ON from an extracted field.
+
+    Prefers the model's `value` -- the tight reference -- but only when it is
+    actually contained in the validated `verbatim` span, ignoring whitespace.
+    That containment check is what keeps this evidentiary: every character of
+    the stored reference demonstrably came from text S4 proved exists in the
+    source, so the tightening cannot introduce anything the document does not
+    say. If `value` is not contained (the model produced something not in the
+    span), the verbatim wins and the discrepancy stays visible.
+
+    Preferring verbatim outright, as this did previously, dragged neighbouring
+    text into the identifier -- real refs were stored as
+    "L.14/5(16)2025/61 Dated Shillong, the 24 May, 2026" -- and a citation to
+    the bare reference then failed to match a letter that WAS in the register.
+    Preferring `value` outright is also wrong: it is unvalidated free text, and
+    real data showed it dropping and inserting characters. The containment test
+    takes the tightness of one and the provenance of the other.
+    """
+    if not field:
+        return None
+    value = (field.get("value") or "").strip()
+    verbatim = (field.get("verbatim") or "").strip()
+    # The model occasionally emits the literal string "null" for an absent
+    # reference rather than a JSON null; treat it as absent.
+    if value.lower() == "null":
+        value = ""
+    if verbatim.lower() == "null":
+        verbatim = ""
+    if not verbatim:
+        return value or None
+    if not value:
+        return verbatim
+    if _squash(value) and _squash(value) in _squash(verbatim):
+        return value
+    return verbatim
+
+
 def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_id: str) -> None:
     """For every cited_ref extracted_field belonging to this run, look up whether it
     matches an existing current letter in the package by normalized reference."""
@@ -69,10 +111,12 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
         cited_fields = cur.fetchall()
 
     for field_id, citing_letter_id, value_text, value_verbatim in cited_fields:
-        # verbatim first: see ingest.py's identical reasoning for letter_ref --
-        # value is unvalidated free-form re-typing and real data showed it
-        # corrupting reference numbers the verbatim text got right.
-        ref_normalized = normalize_ref(value_verbatim or value_text or "")
+        # Same rule as the letter's own reference (see choose_ref): a cited
+        # reference is an identifier, and the verbatim span often includes the
+        # words around it ("Memo NO.PSD/...", "... Dated Shillong, the 21").
+        ref_normalized = normalize_ref(
+            choose_ref({"value": value_text, "verbatim": value_verbatim}) or ""
+        )
         if not ref_normalized:
             continue
 
@@ -270,3 +314,24 @@ def recompute_threads(conn: psycopg.Connection, package_id: str) -> None:
                     """,
                     (thread_id, letter_id, thread_version),
                 )
+
+    # A thread that lost every member (its letters re-threaded elsewhere after a
+    # new citation connected them) still had a row here carrying its old
+    # letter_count, so the table reported more and larger threads than actually
+    # existed -- 30 rows describing 20 real threads. The row is kept rather than
+    # deleted: thread_memberships is an append-only audit of what the register
+    # showed at a past thread_version, and cascading a delete would destroy that
+    # history. Zeroing the count makes the CURRENT state truthful without
+    # rewriting the past.
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE threads t SET letter_count = 0
+            WHERE t.package_id = %s
+              AND NOT EXISTS (
+                  SELECT 1 FROM letters l WHERE l.thread_id = t.id AND l.is_current
+              )
+              AND t.letter_count <> 0
+            """,
+            (package_id,),
+        )
