@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { getStoredGeminiKey, setStoredGeminiKey } from "../lib/api";
+import { getStoredOpenAIKey, setStoredOpenAIKey } from "../lib/api";
 import styles from "./LinearUploadPanel.module.css";
 
 export function LinearUploadPanel({
@@ -17,7 +17,7 @@ export function LinearUploadPanel({
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [apiKey, setApiKey] = useState(() => getStoredGeminiKey());
+  const [apiKey, setApiKey] = useState(() => getStoredOpenAIKey());
   const [showKey, setShowKey] = useState(false);
 
   if (!open) return null;
@@ -78,19 +78,19 @@ export function LinearUploadPanel({
           </div>
 
           <div className={styles.apiKeyBlock}>
-            <label className={styles.apiKeyLabel} htmlFor="gemini-api-key">
-              Gemini API key <span className={styles.apiKeyOptional}>(optional — uses your own quota)</span>
+            <label className={styles.apiKeyLabel} htmlFor="openai-api-key">
+              OpenAI API key <span className={styles.apiKeyOptional}>(optional — uses your own quota)</span>
             </label>
             <div className={styles.apiKeyRow}>
               <input
-                id="gemini-api-key"
+                id="openai-api-key"
                 className={styles.apiKeyInput}
                 type={showKey ? "text" : "password"}
                 placeholder="Leave blank to use the server's own key, if it has one"
                 value={apiKey}
                 onChange={(e) => {
                   setApiKey(e.target.value);
-                  setStoredGeminiKey(e.target.value);
+                  setStoredOpenAIKey(e.target.value);
                 }}
                 autoComplete="off"
               />
@@ -104,9 +104,9 @@ export function LinearUploadPanel({
               </button>
             </div>
             <div className={styles.apiKeyHint}>
-              Stored only in this browser, sent only with your own uploads. Get a free key at{" "}
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-                aistudio.google.com/apikey
+              Stored only in this browser, sent only with your own uploads. Create a key at{" "}
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">
+                platform.openai.com/api-keys
               </a>
               .
             </div>

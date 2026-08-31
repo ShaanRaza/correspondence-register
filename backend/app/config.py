@@ -1,5 +1,5 @@
 """Loads configuration from environment variables / backend/.env. Never hard-codes
-a credential and never writes one — GEMINI_API_KEY is read from whatever the user
+a credential and never writes one — OPENAI_API_KEY is read from whatever the user
 set themselves (shell env or their own .env file), consistent with the rule that
 Claude never sees or enters API keys anywhere."""
 
@@ -17,7 +17,7 @@ load_dotenv(_BACKEND_ROOT / ".env")
 
 @dataclass(frozen=True)
 class Settings:
-    gemini_api_key: str | None
+    openai_api_key: str | None
     database_url: str
     storage_root: Path
     # Shared-password gate, not real per-user auth: this app has no user model.
@@ -29,7 +29,7 @@ class Settings:
 
 def get_settings() -> Settings:
     return Settings(
-        gemini_api_key=os.environ.get("GEMINI_API_KEY") or None,
+        openai_api_key=os.environ.get("OPENAI_API_KEY") or None,
         database_url=os.environ.get(
             "DATABASE_URL", f"postgresql://{os.environ.get('USER', 'postgres')}@localhost:5432/correspondence_register"
         ),

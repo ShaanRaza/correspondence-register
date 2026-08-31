@@ -15,7 +15,7 @@ from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
-from google import genai
+from openai import OpenAI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -89,13 +89,13 @@ def _ingest_blocking(
     package_id: str,
     pdf_bytes: bytes,
     original_filename: str,
-    gemini_api_key: str,
+    openai_api_key: str,
 ) -> IngestResult:
     """Every blocking step of an ingest, isolated so it can be handed to a
     threadpool. HTTPExceptions raised here propagate out of run_in_threadpool
     normally and are handled by FastAPI exactly as if raised inline."""
     store = LocalBlobStore(settings.storage_root)
-    client = genai.Client(api_key=gemini_api_key)
+    client = OpenAI(api_key=openai_api_key)
 
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
@@ -124,31 +124,31 @@ def _ingest_blocking(
 async def upload_document(
     package_id: str,
     file: UploadFile = File(...),
-    gemini_api_key: str | None = Form(None),
+    openai_api_key: str | None = Form(None),
 ) -> dict:
     if file.content_type not in ("application/pdf", "application/octet-stream") and not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
     settings = get_settings()
     # A key typed into the browser (per-request, from Form) takes priority over
-    # the server's own .env -- this lets a second person use their own Gemini
+    # the server's own .env -- this lets a second person use their own OpenAI
     # quota against a shared instance without ever touching the server's
     # environment. It's used for this one request only and never persisted:
     # not written to disk, not put in the database, not logged.
-    effective_key = gemini_api_key or settings.gemini_api_key
+    effective_key = openai_api_key or settings.openai_api_key
     if not effective_key:
         raise HTTPException(
             status_code=500,
             detail=(
-                "No Gemini API key available. Enter one in the Upload panel, or set "
-                "GEMINI_API_KEY on the backend via `export GEMINI_API_KEY=...` or backend/.env."
+                "No OpenAI API key available. Enter one in the Upload panel, or set "
+                "OPENAI_API_KEY on the backend via `export OPENAI_API_KEY=...` or backend/.env."
             ),
         )
 
     pdf_bytes = await file.read()
 
     # Off the event loop, not on it. ingest_pdf() is entirely blocking work --
-    # poppler and tesseract subprocesses, a synchronous Gemini HTTP call, and
+    # poppler and tesseract subprocesses, a synchronous LLM HTTP call, and
     # psycopg queries -- and running it directly inside `async def` froze the
     # single uvicorn worker (Render sets WEB_CONCURRENCY=1 on a 0.1-CPU
     # instance) for the whole ingest. Nothing else could be served meanwhile,
@@ -162,7 +162,7 @@ async def upload_document(
         package_id=package_id,
         pdf_bytes=pdf_bytes,
         original_filename=file.filename,
-        gemini_api_key=effective_key,
+        openai_api_key=effective_key,
     )
 
     if result.error:

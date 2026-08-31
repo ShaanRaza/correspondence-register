@@ -2,7 +2,7 @@
 
 One simplification from PIPELINE.md's original description, stated honestly rather
 than silently: letter-boundary detection (splitting one PDF into several physical
-letters) is delegated to the S3 extraction call itself (Claude returns page_from/
+letters) is delegated to the S3 extraction call itself (the model returns page_from/
 page_to per letter) rather than a separate deterministic heuristic — a real boundary
 detector for "a fresh reference-header block" is a genuine sub-project on its own,
 and delegating the structural judgment to the model, while still requiring every
@@ -22,9 +22,9 @@ import unicodedata
 from dataclasses import dataclass
 
 import psycopg
-from google import genai
+from openai import OpenAI
 
-from .extract import extract_document
+from .extract import MODEL as EXTRACTION_MODEL, extract_document
 from .link import recompute_threads, resolve_citations
 from .ocr import OcrPage, recognize_page
 from .provenance import map_span_to_bbox
@@ -32,7 +32,11 @@ from .rasterize import get_page_count, rasterize_page
 from .storage import LocalBlobStore, original_key, raster_key, sha256_hex
 from .validate import validate_verbatim
 
-PIPELINE_VERSION_ID = "v2"  # v1 was Claude Opus 5; v2 is Gemini 2.5 Flash -- see extract.py
+# Bumped whenever anything that can change the register changes -- here the
+# extraction model. v1 Claude Opus 5, v2 Gemini, v3 OpenAI. The schema treats
+# pipeline_versions as the provenance record for exactly this, so a new LLM
+# gets a new version rather than silently reusing the old one's identity.
+PIPELINE_VERSION_ID = "v3"
 
 
 def normalize_ref(ref: str) -> str:
@@ -81,17 +85,18 @@ def _ensure_pipeline_version(conn: psycopg.Connection) -> None:
             """
             INSERT INTO pipeline_versions (id, ocr_provider, ocr_provider_version, llm_model,
                                             prompt_sha256, schema_sha256, config)
-            VALUES (%s, 'tesseract', '5.5.3', 'gemini-3.6-flash', %s, %s, %s)
+            VALUES (%s, 'tesseract', '5.5.3', %s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING
             """,
-            (PIPELINE_VERSION_ID, "0" * 64, "0" * 64, psycopg.types.json.Json({"lang": "eng+hin"})),
+            (PIPELINE_VERSION_ID, EXTRACTION_MODEL, "0" * 64, "0" * 64,
+             psycopg.types.json.Json({"lang": "eng+hin"})),
         )
 
 
 def ingest_pdf(
     conn: psycopg.Connection,
     store: LocalBlobStore,
-    gemini_client: genai.Client,
+    openai_client: OpenAI,
     *,
     package_id: str,
     pdf_bytes: bytes,
@@ -165,7 +170,7 @@ def ingest_pdf(
             )
         ocr_pages[page.page_no] = recognize_page(page)  # raises if the invariant fails
 
-    # --- S3: extraction (one Claude call for the whole document) ---
+    # --- S3: extraction (one LLM call for the whole document) ---
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -203,7 +208,7 @@ def ingest_pdf(
 
     try:
         result = extract_document(
-            gemini_client,
+            openai_client,
             contract_conditions=contract_conditions,
             package_context=package_context,
             page_texts={pno: p.text for pno, p in ocr_pages.items()},
@@ -237,9 +242,9 @@ def ingest_pdf(
             """
             INSERT INTO llm_requests (extraction_run_id, model, llm_request_id, input_tokens,
                                        output_tokens, cache_read_tokens, status)
-            VALUES (%s, 'gemini-3.6-flash', %s, %s, %s, %s, 'succeeded')
+            VALUES (%s, %s, %s, %s, %s, %s, 'succeeded')
             """,
-            (extraction_run_id, result.request_id, result.usage.input_tokens,
+            (extraction_run_id, EXTRACTION_MODEL, result.request_id, result.usage.input_tokens,
              result.usage.output_tokens, result.usage.cache_read_tokens),
         )
 

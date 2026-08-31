@@ -63,24 +63,24 @@ export interface UploadResult {
   matchedExisting: { letterRef: string | null; existingLetterId: string }[];
 }
 
-// Lets a second person use their own Gemini quota against a shared instance
+// Lets a second person use their own OpenAI quota against a shared instance
 // without touching the server's .env. Stored only in this browser (localStorage
 // is per-origin, never sent anywhere on its own) and attached per-upload; never
 // written to any backend file, database row, or log.
-const GEMINI_KEY_STORAGE = "correspondence_register_gemini_key";
+const OPENAI_KEY_STORAGE = "correspondence_register_openai_key";
 
-export function getStoredGeminiKey(): string {
+export function getStoredOpenAIKey(): string {
   try {
-    return localStorage.getItem(GEMINI_KEY_STORAGE) || "";
+    return localStorage.getItem(OPENAI_KEY_STORAGE) || "";
   } catch {
     return "";
   }
 }
 
-export function setStoredGeminiKey(key: string): void {
+export function setStoredOpenAIKey(key: string): void {
   try {
-    if (key) localStorage.setItem(GEMINI_KEY_STORAGE, key);
-    else localStorage.removeItem(GEMINI_KEY_STORAGE);
+    if (key) localStorage.setItem(OPENAI_KEY_STORAGE, key);
+    else localStorage.removeItem(OPENAI_KEY_STORAGE);
   } catch {
     // Private browsing / storage disabled -- the key just won't persist across reloads.
   }
@@ -89,8 +89,8 @@ export function setStoredGeminiKey(key: string): void {
 export async function uploadDocument(packageId: string, file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
-  const storedKey = getStoredGeminiKey();
-  if (storedKey) form.append("gemini_api_key", storedKey);
+  const storedKey = getStoredOpenAIKey();
+  if (storedKey) form.append("openai_api_key", storedKey);
   const res = await apiFetch(`/api/packages/${packageId}/documents`, {
     method: "POST",
     body: form,
