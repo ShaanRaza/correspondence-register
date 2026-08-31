@@ -7,9 +7,13 @@ import type { ExtractedFieldProvenance, Letter, PackageInfo } from "../types";
 // with its own seeded package_id, distinct from your local one.
 export const UPLOAD_PACKAGE_ID = import.meta.env.VITE_UPLOAD_PACKAGE_ID || "51299903-aec7-43c6-9ad0-cc2043578a0d";
 
-// Configurable per deployment (Vercel sets VITE_API_BASE to the deployed
-// backend's public URL); defaults to local dev.
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+// Configurable per deployment. `??` rather than `||` so an explicitly EMPTY
+// value is honoured and means "same origin": every request becomes a relative
+// URL. That is what lets one process serve the UI and the API behind a single
+// tunnel whose hostname is random and changes on restart -- the bundle never
+// has to know its own public address, and there is no CORS in play. Unset (the
+// local-dev case) still falls back to the separate backend port.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 // Shared-password gate (see backend/app/main.py's `require_app_password`
 // middleware) -- not real per-user auth, just a stop against a random

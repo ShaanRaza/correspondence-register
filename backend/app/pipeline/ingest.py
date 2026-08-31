@@ -108,7 +108,18 @@ def ingest_pdf(
         already_exists = cur.fetchone() is not None
 
     if not already_exists:
-        store.put(original_key(sha256), pdf_bytes, immutable=True)
+        # Write the blob only if it isn't already there. The database row and the
+        # blob can legitimately disagree: the store is keyed by content hash and
+        # outlives any single database, so pointing a fresh/reset database at an
+        # existing storage root leaves blobs present with no matching row. Calling
+        # put() unconditionally then raised FileExistsError from the immutability
+        # guard and failed the whole upload -- every re-upload after a database
+        # reset died this way. Skipping is safe precisely BECAUSE the key is the
+        # sha256: an existing object at this key is byte-identical by construction,
+        # so there is nothing to overwrite and immutability is still honoured.
+        blob_key = original_key(sha256)
+        if not store.exists(blob_key):
+            store.put(blob_key, pdf_bytes, immutable=True)
         with conn.cursor() as cur:
             cur.execute(
                 """

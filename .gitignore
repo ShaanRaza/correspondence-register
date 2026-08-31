@@ -14,3 +14,4 @@ backend/*.egg-info/
 .env.*
 !.env.example
 backend/storage/
+backend/storage_shared/

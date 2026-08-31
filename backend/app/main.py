@@ -10,12 +10,14 @@ here on purpose.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from google import genai
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -51,7 +53,14 @@ async def require_app_password(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     settings = get_settings()
-    if not settings.app_password or request.url.path in ("/api/health", "/docs", "/openapi.json"):
+    path = request.url.path
+    # Only the API is gated. When this process also serves the built frontend
+    # (FRONTEND_DIST, used for single-origin tunnelling), the HTML and asset
+    # requests are ordinary browser navigations that cannot carry a custom
+    # header -- gating them would make the page unloadable and leave nowhere to
+    # type the password. The bundle is not the secret; the register data is,
+    # and every route that returns it still requires the header.
+    if not settings.app_password or not path.startswith("/api/") or path == "/api/health":
         return await call_next(request)
     if request.headers.get("x-app-password") != settings.app_password:
         return Response(status_code=401, content='{"detail":"Missing or incorrect app password."}',
@@ -439,3 +448,17 @@ def confirm_citation(citation_id: str, body: ConfirmCitationBody) -> dict:
         conn.commit()
 
     return {"status": "confirmed"}
+
+
+# Optionally serve the built frontend from this same process. Set FRONTEND_DIST
+# to a Vite build output directory to put the UI and the API on ONE origin,
+# which is what makes a single tunnel (cloudflared/ngrok) work: no CORS to
+# configure, and no rebuilding the frontend every time the tunnel hands out a
+# new random hostname, because the bundle calls the API with relative URLs.
+#
+# Mounted last on purpose: a Mount at "/" matches anything not already claimed
+# by a route, so every /api/... route above still wins. html=True serves
+# index.html for unknown paths, which the hash-based router needs.
+_frontend_dist = os.environ.get("FRONTEND_DIST")
+if _frontend_dist and Path(_frontend_dist).is_dir():
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
