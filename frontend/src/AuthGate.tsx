@@ -46,7 +46,21 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
-  if (session === null) return null;              // still checking
+  if (session === null) {
+    // A visible, non-blank state while checking (bounded to ~8s by
+    // fetchSession's own timeout -- this can no longer hang indefinitely).
+    // Truly blank here reads identically to "broken" with nothing to tell
+    // the two apart.
+    return (
+      <div style={{
+        position: "fixed", inset: 0, display: "flex", alignItems: "center",
+        justifyContent: "center", background: "#0f172a", color: "#94a3b8",
+        fontFamily: "system-ui, sans-serif", fontSize: 13,
+      }}>
+        Loading…
+      </div>
+    );
+  }
   if (session.signedIn) return <>{children}</>;
 
   return (

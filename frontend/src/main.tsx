@@ -29,14 +29,21 @@ import Root from "./Root.tsx";
 import { AuthGate } from "./AuthGate.tsx";
 import { bootstrapConfig } from "./lib/api";
 
-// Resolve the package id from the backend before first render, so no component
-// ever reads a stale build-time id. bootstrapConfig never rejects.
-bootstrapConfig().then(() => {
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <AuthGate>
-        <Root />
-      </AuthGate>
-    </StrictMode>,
-  );
-});
+// Render immediately. Gating the FIRST render on a network request (as this
+// once did) meant one stalled connection left the page permanently blank --
+// React never even mounted, because a plain fetch() with no timeout can hang
+// forever with nothing on screen to show for it, and nothing ever recovers.
+//
+// AuthGate does its own bounded session check after mounting (fetchSession,
+// which now has a hard timeout and self-heals the package id -- see
+// lib/api.ts), so nothing here depends on bootstrapConfig succeeding, or even
+// finishing. It still runs, purely as a best-effort head start for the id used
+// while nobody is signed in yet.
+bootstrapConfig();
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <AuthGate>
+      <Root />
+    </AuthGate>
+  </StrictMode>,
+);

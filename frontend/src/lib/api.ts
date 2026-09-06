@@ -61,11 +61,16 @@ function postJson(path: string, body: unknown): Promise<Response> {
 
 export async function fetchSession(): Promise<Session> {
   try {
-    const res = await apiFetch("/api/auth/me");
-    if (!res.ok) return { signedIn: false, email: null, packageId: null };
-    return await res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/api/auth/me`, { credentials: "include" });
+    if (!res.ok) return DEFAULT_SESSION;
+    const json = await res.json();
+    // Kept in sync here too: this is the check AuthGate actually renders on,
+    // so the package id must be correct even on a run where bootstrapConfig's
+    // OWN request was the one that stalled and hit its timeout.
+    if (json.packageId) UPLOAD_PACKAGE_ID = json.packageId;
+    return json;
   } catch {
-    return { signedIn: false, email: null, packageId: null };
+    return DEFAULT_SESSION;
   }
 }
 
@@ -112,17 +117,37 @@ export function originalPdfUrl(sha256: string): string {
   return `${API_BASE}/api/documents/${sha256}/original`;
 }
 
-/** Resolves the signed-in account's register before the app renders. Failure is
- *  non-fatal: the sign-in screen renders and the real error surfaces there. */
+// A plain fetch() never rejects on a stalled connection -- it just hangs. A
+// request gating first render on that (bootstrapConfig, below) previously had
+// NO timeout, so one flaky connection left the page permanently blank: React
+// never even mounted, since createRoot().render() sat behind a promise that
+// could wait forever. Every startup check now races against a hard deadline
+// so the app is GUARANTEED to reach a visible state -- worst case, the sign-in
+// screen -- rather than staying blank indefinitely.
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const DEFAULT_SESSION: Session = { signedIn: false, email: null, packageId: null };
+
+/** Best-effort early read of the account's register id, so components render
+ *  with the right id from the start rather than the local-dev fallback. Never
+ *  blocks anything on this resolving -- see main.tsx. */
 export async function bootstrapConfig(): Promise<Session> {
   try {
-    const res = await fetch(`${API_BASE}/api/config`, { credentials: "include" });
-    if (!res.ok) return { signedIn: false, email: null, packageId: null };
+    const res = await fetchWithTimeout(`${API_BASE}/api/config`, { credentials: "include" });
+    if (!res.ok) return DEFAULT_SESSION;
     const json = await res.json();
     if (json.packageId) UPLOAD_PACKAGE_ID = json.packageId;
     return { signedIn: !!json.signedIn, email: json.email ?? null, packageId: json.packageId ?? null };
   } catch {
-    return { signedIn: false, email: null, packageId: null };
+    return DEFAULT_SESSION;
   }
 }
 

@@ -986,6 +986,41 @@ def confirm_citation(citation_id: str, body: ConfirmCitationBody, request: Reque
     return {"status": "confirmed"}
 
 
+class _CacheControlledStaticFiles(StaticFiles):
+    """StaticFiles with cache headers that actually match what changes.
+
+    Plain StaticFiles sends no Cache-Control at all -- only ETag/Last-Modified.
+    With nothing explicit, browsers apply their OWN heuristic freshness (a
+    fraction of the file's age), and can serve a cached `index.html` WITHOUT
+    even asking the server. That is actively dangerous here: every deploy
+    replaces the container filesystem outright, so a hashed asset from two
+    deploys ago (e.g. `index-BE9fNK-7.js`) no longer exists on the new one.
+    A browser holding a stale `index.html` that references it hits a 404 for
+    the app's own entry script -- on every refresh, because the cached HTML
+    that's causing it is exactly what a plain refresh does NOT re-fetch.
+    Reproduced directly: an old bundle hash from a stale page load 404'd
+    against the current deploy.
+
+    The fix is the standard split for content-hashed builds:
+      - `index.html` (and anything else NOT under /assets/, e.g. favicon.svg):
+        no-cache -- browsers may keep a copy but MUST revalidate with the
+        server on every load, so a new deploy is picked up on the very next
+        request rather than whenever the heuristic cache happens to expire.
+      - `/assets/*` (Vite's content-hashed filenames): immutable, cached for a
+        year. Safe specifically BECAUSE any content change produces a new
+        filename -- the old name never changes meaning underneath it.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        path = str(args[0]) if args else ""
+        if "/assets/" in path:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Optionally serve the built frontend from this same process. Set FRONTEND_DIST
 # to a Vite build output directory to put the UI and the API on ONE origin,
 # which is what makes a single tunnel (cloudflared/ngrok) work: no CORS to
@@ -997,4 +1032,4 @@ def confirm_citation(citation_id: str, body: ConfirmCitationBody, request: Reque
 # index.html for unknown paths, which the hash-based router needs.
 _frontend_dist = os.environ.get("FRONTEND_DIST")
 if _frontend_dist and Path(_frontend_dist).is_dir():
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
+    app.mount("/", _CacheControlledStaticFiles(directory=_frontend_dist, html=True), name="frontend")
