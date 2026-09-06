@@ -2,13 +2,18 @@
    deliberate colour surface the rest of the page's flat white/slate-50/white
    stacking was missing. */
 .bar {
-  height: 56px;
-  padding: 0 24px;
+  /* min-height, not a fixed height: .right (below) can now wrap onto a
+     second line at narrow widths, and a fixed height would clip that second
+     row instead of showing it. */
+  min-height: 56px;
+  padding: 8px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--l-bar-bg);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 24px;
 }
 
@@ -63,9 +68,14 @@
 .right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 14px;
   flex: 1;
-  min-width: 0;
+  /* A real minimum, not 0: below this, search folding down to icon-width is
+     worse than giving it up its own row via the wrap above. Chosen from the
+     search box's own 120px floor plus enough to keep it legible. */
+  min-width: 260px;
   justify-content: flex-end;
 }
 
@@ -135,6 +145,25 @@
 @media (max-width: 760px) {
   .segmentItemSecondary {
     display: none;
+  }
+}
+
+/* The "X of Y documents ingested" pill was never given a narrow-width
+   fallback at all, unlike every sibling here (.metaSecondary, .uploadStatus,
+   .segmentItemSecondary) -- it predates the Documents and Sign out buttons,
+   which arrived later in the same session and pushed real combined width
+   (title + search + segment + 4 buttons) past 1000px at exactly the ~700px
+   width this bar was already once fixed at. Measured directly: at 696px the
+   search box was forced to a negative left offset, rendering UNDER the title
+   text. The ingested-count pill is supplementary -- search and the four
+   actions are what someone at this width is actually trying to reach -- so
+   it is what gives first. */
+@media (max-width: 980px) {
+  .segmentItemActive {
+    display: none;
+  }
+  .segment {
+    padding: 0;
   }
 }
 

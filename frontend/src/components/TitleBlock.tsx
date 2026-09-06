@@ -32,8 +32,8 @@ export function TitleBlock({
       </div>
       <div className={styles.right}>
         <div className={styles.completeness}>
-          {pkg.documentsIngested} of {pkg.documentsTotal} ingested
-          <span className={styles.fraction}>{visibleCount} shown</span>
+          {pkg.documentsIngested} of {pkg.documentsTotal} documents ingested
+          <span className={styles.fraction}>{visibleCount} letters shown</span>
         </div>
         {uploadStatus && (
           <span className={styles.contractNo} aria-live="polite">

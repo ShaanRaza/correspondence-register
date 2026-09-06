@@ -134,11 +134,18 @@ export function LinearTitleBar({
           )}
         </div>
         <div className={styles.segment}>
+          {/* These two counts measure different UNITS -- source PDFs vs. the
+             individual letters extracted from them -- and shown bare side by
+             side they read as if they should agree when they legitimately
+             don't: one document routinely contains a covering letter plus an
+             enclosure, so 17 documents can (and here does) produce 20
+             letters. The unit is now named in both, not left to be inferred
+             from adjacency. */}
           <span className={`${styles.segmentItem} ${styles.segmentItemActive}`}>
-            {pkg.documentsIngested} of {pkg.documentsTotal} ingested
+            {pkg.documentsIngested} of {pkg.documentsTotal} documents ingested
           </span>
           <span className={`${styles.segmentItem} ${styles.segmentItemSecondary}`}>
-            {visibleCount} shown
+            {visibleCount} letters shown
           </span>
         </div>
         {onOpenReview && !!reviewCount && (
