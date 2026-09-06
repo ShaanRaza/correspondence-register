@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
 
 from openai import OpenAI
@@ -169,6 +170,11 @@ class ExtractionResult:
     usage: ExtractionUsage
     request_id: str | None
     model: str
+    # Wall-clock seconds for the LLM call alone. Recorded because "uploads feel
+    # slow" is not actionable without knowing whether the time went to OCR
+    # (local CPU) or to the model provider (network + queue), and the two have
+    # completely different fixes.
+    llm_seconds: float
 
 
 def build_page_content(page_texts: dict[int, str]) -> str:
@@ -194,6 +200,7 @@ def extract_document(
         f"PACKAGE CONTEXT:\n{package_context}"
     )
 
+    started = time.monotonic()
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -210,6 +217,7 @@ def extract_document(
         },
     )
 
+    llm_seconds = time.monotonic() - started
     content = response.choices[0].message.content
     parsed = json.loads(content) if content else {}
 
@@ -226,4 +234,12 @@ def extract_document(
         cache_read_tokens=cached,
         cache_creation_tokens=0,
     )
-    return ExtractionResult(raw=parsed, usage=usage, request_id=response.id, model=model)
+    print(
+        f"[llm] model={model} {llm_seconds:.2f}s "
+        f"in={usage.input_tokens} out={usage.output_tokens}",
+        flush=True,
+    )
+    return ExtractionResult(
+        raw=parsed, usage=usage, request_id=response.id, model=model,
+        llm_seconds=llm_seconds,
+    )

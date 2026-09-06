@@ -18,6 +18,7 @@ the design for when that changes.
 
 from __future__ import annotations
 
+import time
 import unicodedata
 from dataclasses import dataclass
 
@@ -152,6 +153,7 @@ def ingest_pdf(
     # decoded image in memory at once (the previous approach) is what OOM-killed
     # a real request on a memory-constrained deployment. See rasterize.py.
     page_count = get_page_count(pdf_bytes)
+    ocr_started = time.monotonic()
     ocr_pages: dict[int, OcrPage] = {}
     for page_no in range(1, page_count + 1):
         page = rasterize_page(pdf_bytes, page_no)
@@ -170,6 +172,16 @@ def ingest_pdf(
                 (sha256, PIPELINE_VERSION_ID, page.page_no, page.width_px, page.height_px, store.uri(key)),
             )
         ocr_pages[page.page_no] = recognize_page(page)  # raises if the invariant fails
+
+    ocr_seconds = time.monotonic() - ocr_started
+    # Split reported per document: OCR is local CPU (fixed by a bigger container
+    # or fewer DPI), the LLM call is network + provider queue (fixed by changing
+    # model or provider). Conflating them sends you optimizing the wrong half.
+    print(
+        f"[ocr] {page_count} page(s) {ocr_seconds:.2f}s "
+        f"({ocr_seconds / max(page_count, 1):.2f}s/page)",
+        flush=True,
+    )
 
     # --- S3: extraction (one LLM call for the whole document) ---
     with conn.cursor() as cur:

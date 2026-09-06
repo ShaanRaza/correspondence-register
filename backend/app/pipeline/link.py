@@ -15,6 +15,7 @@ unless a new citation actually connects it to something else.
 
 from __future__ import annotations
 
+import difflib
 import re
 import unicodedata
 
@@ -96,6 +97,51 @@ def choose_ref(field: dict | None) -> str | None:
     return verbatim
 
 
+# --- serial-anchored matching -------------------------------------------------
+#
+# A percentage threshold cannot separate a genuine OCR-garbled match from two
+# different letters, because the two look identical to trigram similarity. In
+# this package's real data every FALSE candidate scored 57-86% purely by sharing
+# a long identical prefix while differing in the trailing serial -- 556 vs 559,
+# 295 vs 367, 61 vs 66, 818 vs 896 -- and the one genuine MISS
+# ("GEN(I)/NH/8/2021/344" vs "GEN(D/NH/8/2021/344 Oo") shared the serial exactly
+# and differed only where OCR mangled the prefix.
+#
+# So the serial is the discriminator, not the score. Anchor on it: the trailing
+# number must match exactly, and the rest may absorb OCR damage. This links the
+# real match and refuses every false one -- the opposite outcome to any
+# percentage cut-off, at any value.
+_TRAILING_SERIAL = re.compile(r"(\d{2,})(?!.*\d)")
+
+
+def split_ref(ref: str) -> tuple[str, str | None]:
+    """(body, trailing serial). Serial is the LAST run of >=2 digits; a single
+    digit is too weak to anchor on and is treated as absent."""
+    m = _TRAILING_SERIAL.search(ref)
+    if not m:
+        return strip_to_alnum(ref), None
+    body = ref[: m.start()] + ref[m.end() :]
+    return strip_to_alnum(body), m.group(1)
+
+
+def serial_anchored_match(cited: str, candidate: str, min_body_similarity: float = 0.6) -> bool:
+    """True when two references are the same letter with OCR damage.
+
+    Requires the trailing serial to be identical -- that is the part which
+    identifies the letter -- while allowing the surrounding text to differ.
+    The body check still has to pass, so two genuinely different letters that
+    happen to share a serial ("AE/PKG3/2023/031" vs "CTR/PKG4/2024/031") do not
+    collapse into one.
+    """
+    cited_body, cited_serial = split_ref(cited)
+    cand_body, cand_serial = split_ref(candidate)
+    if not cited_serial or cited_serial != cand_serial:
+        return False
+    if not cited_body or not cand_body:
+        return False
+    return difflib.SequenceMatcher(None, cited_body, cand_body).ratio() >= min_body_similarity
+
+
 def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_id: str) -> None:
     """For every cited_ref extracted_field belonging to this run, look up whether it
     matches an existing current letter in the package by normalized reference."""
@@ -170,7 +216,8 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                 # for a human to confirm, never auto-resolved.
                 cur.execute(
                     """
-                    SELECT id, similarity(letter_ref_normalized, %s) AS score
+                    SELECT id, similarity(letter_ref_normalized, %s) AS score,
+                           letter_ref_normalized
                     FROM letters
                     WHERE package_id = %s AND is_current AND id != %s
                           AND letter_ref_normalized IS NOT NULL
@@ -180,10 +227,26 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                     """,
                     (ref_normalized, package_id, citing_letter_id, ref_normalized),
                 )
-                fuzzy_candidates = cur.fetchall()
-                resolution, cited_letter_id = (
-                    ("unresolved_ambiguous", None) if fuzzy_candidates else ("unresolved_missing", None)
-                )
+                scored = cur.fetchall()
+                # Candidate rows keep the (id, score) shape the review queue writes.
+                fuzzy_candidates = [(row[0], row[1]) for row in scored]
+
+                # Serial-anchored auto-resolve: the trailing serial must match
+                # exactly, so this fires only where OCR damaged the surrounding
+                # text of an otherwise identical reference. Requires exactly one
+                # such candidate -- two would be genuinely ambiguous and belong
+                # in review, not silently picked between.
+                anchored = [
+                    row[0] for row in scored
+                    if serial_anchored_match(ref_normalized, row[2] or "")
+                ]
+                if len(anchored) == 1:
+                    resolution, cited_letter_id = "resolved", anchored[0]
+                else:
+                    resolution, cited_letter_id = (
+                        ("unresolved_ambiguous", None) if fuzzy_candidates
+                        else ("unresolved_missing", None)
+                    )
 
             cur.execute(
                 """

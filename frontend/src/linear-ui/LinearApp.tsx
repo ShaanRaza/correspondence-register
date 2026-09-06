@@ -9,6 +9,7 @@ import { LinearCitationReviewPanel } from "./LinearCitationReviewPanel";
 import tokenStyles from "./tokens.module.css";
 import { EMPTY_FILTERS, type Filters } from "../components/FilterBand";
 import { runQuery, type QueryResult } from "../lib/query";
+import { buildSuggestions } from "../lib/suggest";
 import { letters as fixtureLetters, packageInfo as fixturePackageInfo } from "../data/fixtures";
 import { parseChainageMetres } from "../lib/chainage";
 import type { Letter, PackageInfo } from "../types";
@@ -155,10 +156,13 @@ export function LinearApp() {
     setView({ screen: "thread", threadKey: letter.threadKey, selectedId: letter.id });
   };
 
-  const submitQuery = () => {
-    setQueryResult(runQuery(queryText, letters, packageInfo));
+  const submitQuery = (text?: string) => {
+    setQueryResult(runQuery(text ?? queryText, letters, packageInfo));
     setQueryPanelOpen(true);
   };
+
+  // Rebuilt only when the register changes, not on every keystroke.
+  const suggestions = useMemo(() => buildSuggestions(letters), [letters]);
 
   const overlays = (
     <>
@@ -205,6 +209,7 @@ export function LinearApp() {
         queryText={queryText}
         onQueryTextChange={setQueryText}
         onSubmitQuery={submitQuery}
+        suggestions={suggestions}
         onOpenUpload={() => setUploadOpen(true)}
         uploadStatus={uploadStatus}
         onOpenReview={live ? () => setCitationReviewOpen(true) : undefined}

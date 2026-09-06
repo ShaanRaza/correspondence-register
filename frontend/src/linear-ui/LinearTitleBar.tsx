@@ -1,5 +1,7 @@
+import { useMemo, useRef, useState } from "react";
 import type { PackageInfo } from "../types";
 import { formatDate } from "../lib/dates";
+import { matchSuggestions, type Suggestion } from "../lib/suggest";
 import styles from "./LinearTitleBar.module.css";
 
 export function LinearTitleBar({
@@ -12,17 +14,39 @@ export function LinearTitleBar({
   uploadStatus,
   onOpenReview,
   reviewCount,
+  suggestions = [],
 }: {
   pkg: PackageInfo;
   visibleCount: number;
   queryText: string;
   onQueryTextChange: (text: string) => void;
-  onSubmitQuery: () => void;
+  /** Optional override: a suggestion is searched immediately, and passing
+   *  the text avoids reading queryText before React has applied it. */
+  onSubmitQuery: (text?: string) => void;
   onOpenUpload: () => void;
   uploadStatus?: string | null;
   onOpenReview?: () => void;
   reviewCount?: number;
+  /** Vocabulary drawn from this package's own letters (lib/suggest.ts). */
+  suggestions?: Suggestion[];
 }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const blurTimer = useRef<number | undefined>(undefined);
+
+  const matches = useMemo(
+    () => (open ? matchSuggestions(queryText, suggestions) : []),
+    [open, queryText, suggestions],
+  );
+
+  const choose = (text: string) => {
+    onQueryTextChange(text);
+    setOpen(false);
+    setActive(-1);
+    // Search the chosen term immediately -- picking a suggestion IS the query.
+    onSubmitQuery(text);
+  };
+
   return (
     <div className={styles.bar}>
       <div className={styles.left}>
@@ -50,11 +74,61 @@ export function LinearTitleBar({
             aria-label="Search this package's register"
             placeholder="Search correspondence — package, party, chainage, subject…"
             value={queryText}
-            onChange={(e) => onQueryTextChange(e.target.value)}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={matches.length > 0}
+            aria-controls="search-suggestions"
+            onChange={(e) => {
+              onQueryTextChange(e.target.value);
+              setOpen(true);
+              setActive(-1);
+            }}
+            onFocus={() => setOpen(true)}
+            // Deferred so a click on a suggestion lands before the list unmounts.
+            onBlur={() => {
+              blurTimer.current = window.setTimeout(() => setOpen(false), 120);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") onSubmitQuery();
+              if (e.key === "ArrowDown" && matches.length) {
+                e.preventDefault();
+                setOpen(true);
+                setActive((i) => (i + 1) % matches.length);
+              } else if (e.key === "ArrowUp" && matches.length) {
+                e.preventDefault();
+                setActive((i) => (i <= 0 ? matches.length - 1 : i - 1));
+              } else if (e.key === "Enter") {
+                if (active >= 0 && matches[active]) choose(matches[active].text);
+                else {
+                  setOpen(false);
+                  onSubmitQuery();
+                }
+              } else if (e.key === "Escape") {
+                setOpen(false);
+                setActive(-1);
+              }
             }}
           />
+          {matches.length > 0 && (
+            <ul className={styles.suggestions} id="search-suggestions" role="listbox">
+              {matches.map((s, i) => (
+                <li
+                  key={`${s.kind}:${s.text}`}
+                  role="option"
+                  aria-selected={i === active}
+                  className={`${styles.suggestion} ${i === active ? styles.suggestionActive : ""}`}
+                  onMouseEnter={() => setActive(i)}
+                  onMouseDown={() => {
+                    // mousedown, not click: fires before the input's blur.
+                    window.clearTimeout(blurTimer.current);
+                    choose(s.text);
+                  }}
+                >
+                  <span className={styles.suggestionText}>{s.text}</span>
+                  <span className={styles.suggestionKind}>{s.kind}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className={styles.segment}>
           <span className={`${styles.segmentItem} ${styles.segmentItemActive}`}>
