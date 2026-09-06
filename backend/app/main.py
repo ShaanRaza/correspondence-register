@@ -16,13 +16,13 @@ from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
-from openai import OpenAI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from .bootstrap import ensure_schema
+from .pipeline.extract import make_client, resolve_base_url, resolve_model
 from .config import get_settings
 from .pipeline.ingest import IngestResult, ingest_pdf
 from .pipeline.link import recompute_threads
@@ -141,7 +141,10 @@ def _ingest_blocking(
     threadpool. HTTPExceptions raised here propagate out of run_in_threadpool
     normally and are handled by FastAPI exactly as if raised inline."""
     store = LocalBlobStore(settings.storage_root)
-    client = OpenAI(api_key=openai_api_key)
+    # Works against OpenAI or any OpenAI-compatible gateway (OpenRouter):
+    # see extract.resolve_base_url / resolve_model.
+    client = make_client(openai_api_key)
+    llm_model = resolve_model(resolve_base_url(openai_api_key))
 
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
@@ -159,6 +162,7 @@ def _ingest_blocking(
                 original_filename=original_filename,
                 contract_conditions=DEFAULT_CONTRACT_CONDITIONS,
                 package_context=DEFAULT_PACKAGE_CONTEXT,
+                llm_model=llm_model,
             )
         except AssertionError as e:
             # The OCR offset invariant failing is a real, actionable pipeline bug --

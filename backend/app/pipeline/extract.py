@@ -26,7 +26,40 @@ from openai import OpenAI
 # because this task is extraction rather than reasoning -- the model is copying
 # spans out of supplied text, and a small fast model keeps per-document latency
 # (the dominant cost of a batch upload) low.
-MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_MODEL = "gpt-4o-mini"
+
+# Any OpenAI-compatible gateway works, OpenRouter included: it speaks the same
+# /chat/completions contract, so only the base URL and the model naming change.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def resolve_base_url(api_key: str) -> str | None:
+    """Where to send requests. Explicit config wins; otherwise an OpenRouter key
+    is recognised by its own prefix so a key pasted into the browser upload panel
+    reaches the right host without any server-side configuration -- that path has
+    no env vars to set."""
+    explicit = os.environ.get("OPENAI_BASE_URL")
+    if explicit:
+        return explicit.rstrip("/")
+    if api_key.startswith("sk-or-"):
+        return OPENROUTER_BASE_URL
+    return None  # the SDK's own default (api.openai.com)
+
+
+def resolve_model(base_url: str | None) -> str:
+    """OpenRouter namespaces every model by provider ('openai/gpt-4o-mini'); a
+    bare name is rejected there. Prefixing a name that has no '/' keeps one
+    OPENAI_MODEL value working against either backend, and an explicitly
+    namespaced value (including a non-OpenAI one) is passed through untouched."""
+    model = os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+    if base_url and "openrouter.ai" in base_url and "/" not in model:
+        return f"openai/{model}"
+    return model
+
+
+def make_client(api_key: str) -> OpenAI:
+    base_url = resolve_base_url(api_key)
+    return OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
 _FIELD_STR = {
     "type": "object",
@@ -135,6 +168,7 @@ class ExtractionResult:
     raw: dict
     usage: ExtractionUsage
     request_id: str | None
+    model: str
 
 
 def build_page_content(page_texts: dict[int, str]) -> str:
@@ -147,6 +181,7 @@ def build_page_content(page_texts: dict[int, str]) -> str:
 def extract_document(
     client: OpenAI,
     *,
+    model: str,
     contract_conditions: str,
     package_context: str,
     page_texts: dict[int, str],
@@ -160,7 +195,7 @@ def extract_document(
     )
 
     response = client.chat.completions.create(
-        model=MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": build_page_content(page_texts)},
@@ -191,4 +226,4 @@ def extract_document(
         cache_read_tokens=cached,
         cache_creation_tokens=0,
     )
-    return ExtractionResult(raw=parsed, usage=usage, request_id=response.id)
+    return ExtractionResult(raw=parsed, usage=usage, request_id=response.id, model=model)

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 import psycopg
 from openai import OpenAI
 
-from .extract import MODEL as EXTRACTION_MODEL, extract_document
+from .extract import extract_document
 from .link import choose_ref, recompute_threads, resolve_citations
 from .ocr import OcrPage, recognize_page
 from .provenance import map_span_to_bbox
@@ -79,7 +79,7 @@ class IngestResult:
     matched_existing: list[dict] | None = None
 
 
-def _ensure_pipeline_version(conn: psycopg.Connection) -> None:
+def _ensure_pipeline_version(conn: psycopg.Connection, llm_model: str) -> None:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -88,7 +88,7 @@ def _ensure_pipeline_version(conn: psycopg.Connection) -> None:
             VALUES (%s, 'tesseract', '5.5.3', %s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING
             """,
-            (PIPELINE_VERSION_ID, EXTRACTION_MODEL, "0" * 64, "0" * 64,
+            (PIPELINE_VERSION_ID, llm_model, "0" * 64, "0" * 64,
              psycopg.types.json.Json({"lang": "eng+hin"})),
         )
 
@@ -103,8 +103,9 @@ def ingest_pdf(
     original_filename: str,
     contract_conditions: str,
     package_context: str,
+    llm_model: str,
 ) -> IngestResult:
-    _ensure_pipeline_version(conn)
+    _ensure_pipeline_version(conn, llm_model)
 
     # --- S0: intake ---
     sha256 = sha256_hex(pdf_bytes)
@@ -209,6 +210,7 @@ def ingest_pdf(
     try:
         result = extract_document(
             openai_client,
+            model=llm_model,
             contract_conditions=contract_conditions,
             package_context=package_context,
             page_texts={pno: p.text for pno, p in ocr_pages.items()},
@@ -244,7 +246,7 @@ def ingest_pdf(
                                        output_tokens, cache_read_tokens, status)
             VALUES (%s, %s, %s, %s, %s, %s, 'succeeded')
             """,
-            (extraction_run_id, EXTRACTION_MODEL, result.request_id, result.usage.input_tokens,
+            (extraction_run_id, result.model, result.request_id, result.usage.input_tokens,
              result.usage.output_tokens, result.usage.cache_read_tokens),
         )
 
