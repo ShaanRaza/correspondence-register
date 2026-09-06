@@ -331,6 +331,33 @@ def ingest_pdf(
     for cand in candidates:
         raw = cand["raw"]
 
+        # A candidate with NOTHING extracted is not a letter -- it is the model
+        # correctly declining to hallucinate content it could not read, per its
+        # own instructions ("use null rather than guessing"). Real cause seen in
+        # production: a page so badly scanned that OCR produced pure garbage
+        # ("(f= OF lw, Ae a5h Salty 2..."), which the model split into its own
+        # page range per the letter-splitting instruction and then, honestly,
+        # extracted nothing from. Inserting a letter row anyway manufactured a
+        # phantom register entry -- a real serial, a real row, in an
+        # EVIDENTIARY register -- for something that is not evidence of
+        # anything. The distinction that matters: this is not "half-extracted"
+        # (PIPELINE.md's S6-S8 guarantee is about a transaction being cut
+        # short, not about content quality), it is a page the model looked at
+        # and found NOTHING on. Fields are still validated and stored with no
+        # letter_id, exactly like the duplicate-match path below, so the
+        # audit trail -- "the model saw this page and extracted nothing" --
+        # is never lost; the page's own OCR text also remains fully available
+        # via the source document. It simply does not mint a register row.
+        if not any([
+            cand["letter_ref"],
+            cand["dated"],
+            (raw.get("subject") or {}).get("value"),
+            (raw.get("from_party") or {}).get("value"),
+            (raw.get("to_party") or {}).get("value"),
+        ]):
+            _insert_validated_fields(conn, extraction_run_id, None, raw, ocr_pages)
+            continue
+
         # Near-duplicate check: a letter_ref already registered in this package --
         # from ANY source document, not just a re-extraction of this same one --
         # means this is a re-scan or duplicate submission of the same physical
