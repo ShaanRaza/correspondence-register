@@ -488,6 +488,16 @@ CREATE TABLE citations (
     cited_ref_normalized  text NOT NULL,
     cited_letter_id       uuid REFERENCES letters(id),
     resolution            citation_state NOT NULL,
+    -- WHO decided this link, which is evidentiary metadata rather than
+    -- bookkeeping: a tribunal-facing register must be able to say whether a
+    -- connection was derived mechanically, approved by a person, or applied
+    -- from a rule that person previously approved.
+    --   pipeline - matched by the deterministic rules in link.py
+    --   human    - confirmed by a person in the review queue
+    --   alias    - applied automatically from a human-confirmed alias
+    -- It also protects human decisions: re-resolution never overwrites 'human'.
+    resolution_source     text NOT NULL DEFAULT 'pipeline'
+                          CHECK (resolution_source IN ('pipeline','human','alias')),
     UNIQUE (citing_letter_id, cited_ref_normalized),
     CHECK ((resolution = 'resolved') = (cited_letter_id IS NOT NULL)),
     -- Composite FKs (round 2, #4): citing_letter_id and cited_letter_id must belong to
@@ -497,6 +507,22 @@ CREATE TABLE citations (
     FOREIGN KEY (citing_letter_id, package_id) REFERENCES letters (id, package_id),
     FOREIGN KEY (cited_letter_id, package_id) REFERENCES letters (id, package_id)
 );
+
+-- A reference string a person has confirmed refers to a particular letter.
+-- Learned ONLY from explicit confirmations in the review queue -- never inferred
+-- from a similarity score -- so every row here is a human decision that can be
+-- inspected and withdrawn. Applying them on later ingests is what stops the same
+-- OCR corruption having to be re-confirmed on every new document that repeats it.
+CREATE TABLE citation_aliases (
+    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    package_id           uuid NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+    cited_ref_normalized text NOT NULL,
+    letter_id            uuid NOT NULL REFERENCES letters(id) ON DELETE CASCADE,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    -- One meaning per reference string per package; a later confirmation wins.
+    UNIQUE (package_id, cited_ref_normalized)
+);
+CREATE INDEX citation_aliases_lookup ON citation_aliases (package_id, cited_ref_normalized);
 
 CREATE INDEX citations_cited  ON citations (cited_letter_id);
 CREATE INDEX citations_citing ON citations (citing_letter_id);

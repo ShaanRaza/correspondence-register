@@ -25,7 +25,7 @@ from .bootstrap import ensure_schema
 from .pipeline.extract import make_client, resolve_base_url, resolve_model
 from .config import get_settings
 from .pipeline.ingest import IngestResult, ingest_pdf
-from .pipeline.link import recompute_threads
+from .pipeline.link import recompute_threads, reresolve_package
 from .pipeline.storage import LocalBlobStore
 
 @asynccontextmanager
@@ -493,10 +493,36 @@ def confirm_citation(citation_id: str, body: ConfirmCitationBody) -> dict:
                 )
 
             cur.execute(
-                "UPDATE citations SET resolution = 'resolved', cited_letter_id = %s WHERE id = %s",
+                """
+                UPDATE citations
+                SET resolution = 'resolved', cited_letter_id = %s,
+                    resolution_source = 'human'
+                WHERE id = %s
+                RETURNING cited_ref_normalized
+                """,
                 (body.candidate_letter_id, citation_id),
             )
+            (cited_ref_normalized,) = cur.fetchone()
 
+            # Remember the decision, so the same OCR corruption does not have to
+            # be re-confirmed on every future document that repeats it. Learned
+            # ONLY from this explicit confirmation -- never from a score -- so
+            # every alias is a human judgement that can be inspected or removed.
+            # A later confirmation of the same string supersedes an earlier one.
+            cur.execute(
+                """
+                INSERT INTO citation_aliases (package_id, cited_ref_normalized, letter_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (package_id, cited_ref_normalized)
+                DO UPDATE SET letter_id = EXCLUDED.letter_id, created_at = now()
+                """,
+                (package_id, cited_ref_normalized, body.candidate_letter_id),
+            )
+
+        # Apply the new alias across the package immediately, so a confirmation
+        # resolves every other citation of the same reference at once instead of
+        # presenting them one at a time.
+        reresolve_package(conn, str(package_id))
         recompute_threads(conn, str(package_id))
         conn.commit()
 

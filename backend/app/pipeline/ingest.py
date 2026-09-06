@@ -26,7 +26,7 @@ import psycopg
 from openai import OpenAI
 
 from .extract import extract_document
-from .link import choose_ref, recompute_threads, resolve_citations
+from .link import choose_ref, recompute_threads, reresolve_package
 from .ocr import OcrPage, recognize_page
 from .provenance import map_span_to_bbox
 from .rasterize import get_page_count, rasterize_page
@@ -132,6 +132,11 @@ def ingest_pdf(
                 """
                 INSERT INTO documents (sha256, byte_size, mime_type, original_filename, storage_uri)
                 VALUES (%s, %s, 'application/pdf', %s, %s)
+                -- Idempotent because the check above and this insert are not one
+                -- atomic step: with concurrent uploads two requests carrying the
+                -- SAME file both see "not present" and both insert. The key is
+                -- the content hash, so the loser has nothing to add anyway.
+                ON CONFLICT (sha256) DO NOTHING
                 """,
                 (sha256, len(pdf_bytes), original_filename, store.uri(original_key(sha256))),
             )
@@ -188,11 +193,22 @@ def ingest_pdf(
         cur.execute(
             """
             INSERT INTO extraction_runs (document_sha256, package_id, pipeline_version_id, status)
-            VALUES (%s, %s, %s, 'running') RETURNING id
+            VALUES (%s, %s, %s, 'running')
+            -- extraction_runs_one_current allows a single live run per document
+            -- per package. With concurrent uploads the same file can be in
+            -- flight twice: the duplicate check above passes for both, and this
+            -- index is what actually enforces the rule. Yielding here turns that
+            -- collision into the same "already ingested" answer a sequential
+            -- second upload gets, rather than a 500.
+            ON CONFLICT DO NOTHING
+            RETURNING id
             """,
             (sha256, package_id, PIPELINE_VERSION_ID),
         )
-        (extraction_run_id,) = cur.fetchone()
+        run_row = cur.fetchone()
+        if run_row is None:
+            return IngestResult(sha256, True, None, [], error=None)
+        (extraction_run_id,) = run_row
 
     # page_ocr is scoped to (extraction_run_id, page_no) -- not document_pages -- because
     # OCR text/tokens can legitimately differ between runs (a re-extraction under a new
@@ -353,7 +369,9 @@ def ingest_pdf(
         _insert_validated_fields(conn, extraction_run_id, letter_id, raw, ocr_pages)
 
     # --- S7: citation resolution + threading (package-wide recompute) ---
-    resolve_citations(conn, package_id, str(extraction_run_id))
+    # Whole package, not just this run -- see reresolve_package: resolving only
+    # the current run left citations to later-uploaded documents stranded.
+    reresolve_package(conn, package_id)
     recompute_threads(conn, package_id)
 
     # --- S8: publish. Everything above this point in the function is fast,

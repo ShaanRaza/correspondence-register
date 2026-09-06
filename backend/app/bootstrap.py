@@ -46,13 +46,78 @@ def _strip_pgvector(sql: str) -> str:
     return stripped.replace('CREATE EXTENSION IF NOT EXISTS "vector";', "")
 
 
+# Additive, idempotent changes applied on every boot. Kept deliberately tiny and
+# explicitly enumerated: this is not a general migration runner, and nothing here
+# may drop, rename, or rewrite existing data. Anything beyond adding an optional
+# column or a new table belongs in a considered migration, not a startup hook.
+_ADDITIVE_MIGRATIONS = (
+    """
+    ALTER TABLE citations ADD COLUMN IF NOT EXISTS resolution_source text
+        NOT NULL DEFAULT 'pipeline'
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS citation_aliases (
+        id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        package_id           uuid NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+        cited_ref_normalized text NOT NULL,
+        letter_id            uuid NOT NULL REFERENCES letters(id) ON DELETE CASCADE,
+        created_at           timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (package_id, cited_ref_normalized)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS citation_aliases_lookup
+        ON citation_aliases (package_id, cited_ref_normalized)
+    """,
+)
+
+
+def apply_additive_migrations(database_url: str) -> None:
+    """Brings an already-provisioned database up to the current schema for the
+    additive changes above. A fresh database gets these from schema.sql itself;
+    this exists for databases created before they were added."""
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'citations' AND column_name = 'resolution_source'
+                """
+            )
+            had_source_column = cur.fetchone() is not None
+
+            for statement in _ADDITIVE_MIGRATIONS:
+                cur.execute(statement)
+
+            if not had_source_column:
+                # Citations resolved BEFORE this column existed cannot be
+                # attributed retroactively -- the database never recorded who
+                # decided them. Treating them as human is the safe direction:
+                # it protects real confirmations from being overwritten by a
+                # later mechanical pass, at the cost of freezing a few links the
+                # pipeline could have derived anyway. Losing a person's decision
+                # is the worse error, so it is the one this avoids.
+                cur.execute(
+                    "UPDATE citations SET resolution_source = 'human' "
+                    "WHERE resolution = 'resolved'"
+                )
+                print(
+                    f"[bootstrap] marked {cur.rowcount} pre-existing resolved "
+                    "citation(s) as human-confirmed (unattributable, protected)",
+                    flush=True,
+                )
+
+
 def ensure_schema(database_url: str) -> None:
     """Applies the schema and seeds a package if the database is blank."""
     with psycopg.connect(database_url, autocommit=True) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT to_regclass('public.packages')")
             if cur.fetchone()[0] is not None:
-                return  # Already provisioned -- never touch an existing database.
+                # Provisioned already: apply only the additive changes and stop.
+                # The schema itself is never re-applied over existing data.
+                apply_additive_migrations(database_url)
+                return
 
             path = _schema_path()
             if not path.is_file():

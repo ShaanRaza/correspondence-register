@@ -167,6 +167,7 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
             continue
 
         with conn.cursor() as cur:
+            source = "pipeline"
             cur.execute(
                 """
                 SELECT id FROM letters
@@ -197,7 +198,28 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                 if len(alnum_matches) == 1:
                     matches = alnum_matches
 
-            if len(matches) == 1:
+            # A reference string a person has already confirmed for this package.
+            # Ranked above the mechanical fuzzy rules because it IS a human
+            # decision -- just one made earlier, on a different document.
+            alias_letter_id = None
+            if not matches:
+                cur.execute(
+                    """
+                    SELECT a.letter_id FROM citation_aliases a
+                    JOIN letters l ON l.id = a.letter_id AND l.is_current
+                    WHERE a.package_id = %s AND a.cited_ref_normalized = %s
+                          AND a.letter_id != %s
+                    """,
+                    (package_id, ref_normalized, citing_letter_id),
+                )
+                alias_row = cur.fetchone()
+                if alias_row is not None:
+                    alias_letter_id = alias_row[0]
+
+            if alias_letter_id is not None:
+                resolution, cited_letter_id = "resolved", alias_letter_id
+                source = "alias"
+            elif len(matches) == 1:
                 resolution, cited_letter_id = "resolved", matches[0]
             elif len(matches) > 1:
                 resolution, cited_letter_id = "unresolved_ambiguous", None
@@ -251,17 +273,27 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
             cur.execute(
                 """
                 INSERT INTO citations (package_id, citing_letter_id, cited_ref_text,
-                                        cited_ref_normalized, cited_letter_id, resolution)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                                        cited_ref_normalized, cited_letter_id, resolution,
+                                        resolution_source)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (citing_letter_id, cited_ref_normalized)
                 DO UPDATE SET cited_letter_id = EXCLUDED.cited_letter_id,
-                              resolution = EXCLUDED.resolution
+                              resolution = EXCLUDED.resolution,
+                              resolution_source = EXCLUDED.resolution_source
+                -- A person's confirmation is never overwritten by a later
+                -- mechanical pass. Re-resolution can only ever ADD links.
+                WHERE citations.resolution_source <> 'human'
                 RETURNING id
                 """,
                 (package_id, citing_letter_id, value_verbatim or value_text,
-                 ref_normalized, cited_letter_id, resolution),
+                 ref_normalized, cited_letter_id, resolution, source),
             )
-            (citation_id,) = cur.fetchone()
+            row = cur.fetchone()
+            if row is None:
+                # The WHERE above suppressed the update: this citation is
+                # human-confirmed and stands as decided. Nothing left to record.
+                continue
+            (citation_id,) = row
 
             cur.execute(
                 "INSERT INTO citation_occurrences (citation_id, extracted_field_id) "
@@ -304,6 +336,33 @@ class _UnionFind:
         ra, rb = self.find(a), self.find(b)
         if ra != rb:
             self.parent[ra] = rb
+
+
+def reresolve_package(conn: psycopg.Connection, package_id: str) -> None:
+    """Re-runs citation resolution across the WHOLE package, not just the run
+    being ingested.
+
+    Resolving only the current run made the register order-dependent: a letter
+    citing a reference whose document had not been uploaded yet was recorded as
+    "not held" and never revisited, so the link stayed missing even once the
+    target arrived. Demonstrated directly -- a citation resolved on a re-run
+    after sitting unresolved_missing through the ingest that should have
+    produced it.
+
+    Re-running everything makes upload ORDER irrelevant, which is also what
+    makes concurrent uploads safe: whichever document lands first, the final
+    state is the same. Human confirmations are protected by the conflict clause
+    in resolve_citations, so this can only add links, never undo a decision.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT extraction_run_id FROM letters "
+            "WHERE package_id = %s AND is_current AND extraction_run_id IS NOT NULL",
+            (package_id,),
+        )
+        runs = [row[0] for row in cur.fetchall()]
+    for run_id in runs:
+        resolve_citations(conn, package_id, str(run_id))
 
 
 def recompute_threads(conn: psycopg.Connection, package_id: str) -> None:

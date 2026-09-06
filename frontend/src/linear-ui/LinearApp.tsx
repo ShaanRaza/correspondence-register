@@ -104,20 +104,47 @@ export function LinearApp() {
     const list = Array.from(files);
     let succeeded = 0;
     let failed = 0;
+    let done = 0;
     let lastMessage = "";
-    for (let i = 0; i < list.length; i++) {
-      setUploadStatus(`Uploading ${i + 1} of ${list.length}: ${list[i].name}…`);
-      try {
-        const result = await uploadDocument(UPLOAD_PACKAGE_ID, list[i]);
-        succeeded++;
-        lastMessage = describeUploadResult(list[i].name, result);
-      } catch (e) {
-        failed++;
-        lastMessage = `${list[i].name}: failed — ${(e as Error).message}`;
+
+    // Three at a time. Each document is an independent OCR pass and its own LLM
+    // call, so nothing about the EXTRACTION depends on the others -- the results
+    // are identical either way. What concurrency would once have disturbed is
+    // citation resolution, which only looked at the run being ingested and so
+    // depended on upload order; the backend now re-resolves the whole package
+    // after every document, which makes arrival order irrelevant and this safe.
+    //
+    // Held to 3 deliberately: the ceiling here is the model provider's rate
+    // limit, not the browser, and a wide fan-out converts a slow batch into a
+    // burst of 429s that fails documents outright.
+    const CONCURRENCY = 3;
+    let next = 0;
+
+    const worker = async () => {
+      while (next < list.length) {
+        const file = list[next++];
+        try {
+          const result = await uploadDocument(UPLOAD_PACKAGE_ID, file);
+          succeeded++;
+          lastMessage = describeUploadResult(file.name, result);
+        } catch (e) {
+          failed++;
+          lastMessage = `${file.name}: failed — ${(e as Error).message}`;
+        }
+        done++;
+        setUploadStatus(
+          list.length === 1 ? lastMessage : `${done} of ${list.length} done — ${lastMessage}`,
+        );
+        // Refresh as results land so the register fills in during the batch
+        // rather than only at the end.
+        await refreshLive().catch(() => {});
       }
-      setUploadStatus(lastMessage);
-      await refreshLive().catch(() => {});
-    }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, list.length) }, () => worker()),
+    );
+
     setUploadStatus(
       list.length === 1 ? lastMessage : `Done: ${succeeded} of ${list.length} succeeded${failed ? `, ${failed} failed` : ""}`,
     );
