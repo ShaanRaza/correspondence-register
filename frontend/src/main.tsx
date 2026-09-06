@@ -27,6 +27,7 @@ import "@fontsource/ibm-plex-sans/600.css";
 
 import Root from "./Root.tsx";
 import { AuthGate } from "./AuthGate.tsx";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { bootstrapConfig } from "./lib/api";
 
 // Render immediately. Gating the FIRST render on a network request (as this
@@ -42,8 +43,10 @@ import { bootstrapConfig } from "./lib/api";
 bootstrapConfig();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthGate>
-      <Root />
-    </AuthGate>
+    <ErrorBoundary>
+      <AuthGate>
+        <Root />
+      </AuthGate>
+    </ErrorBoundary>
   </StrictMode>,
 );
