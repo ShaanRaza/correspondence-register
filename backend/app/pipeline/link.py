@@ -171,7 +171,7 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
             cur.execute(
                 """
                 SELECT id FROM letters
-                WHERE package_id = %s AND is_current AND letter_ref_normalized = %s
+                WHERE package_id = %s AND is_current AND voided_at IS NULL AND letter_ref_normalized = %s
                       AND id != %s
                 """,
                 (package_id, ref_normalized, citing_letter_id),
@@ -188,7 +188,7 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                 cur.execute(
                     f"""
                     SELECT id FROM letters
-                    WHERE package_id = %s AND is_current AND id != %s
+                    WHERE package_id = %s AND is_current AND voided_at IS NULL AND id != %s
                           AND letter_ref_normalized IS NOT NULL
                           AND {_ALNUM_SQL.format(col='letter_ref_normalized')} = %s
                     """,
@@ -206,7 +206,7 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                 cur.execute(
                     """
                     SELECT a.letter_id FROM citation_aliases a
-                    JOIN letters l ON l.id = a.letter_id AND l.is_current
+                    JOIN letters l ON l.id = a.letter_id AND l.is_current AND l.voided_at IS NULL
                     WHERE a.package_id = %s AND a.cited_ref_normalized = %s
                           AND a.letter_id != %s
                     """,
@@ -241,7 +241,7 @@ def resolve_citations(conn: psycopg.Connection, package_id: str, extraction_run_
                     SELECT id, similarity(letter_ref_normalized, %s) AS score,
                            letter_ref_normalized
                     FROM letters
-                    WHERE package_id = %s AND is_current AND id != %s
+                    WHERE package_id = %s AND is_current AND voided_at IS NULL AND id != %s
                           AND letter_ref_normalized IS NOT NULL
                           AND similarity(letter_ref_normalized, %s) >= 0.5
                     ORDER BY score DESC
@@ -357,7 +357,8 @@ def reresolve_package(conn: psycopg.Connection, package_id: str) -> None:
     with conn.cursor() as cur:
         cur.execute(
             "SELECT DISTINCT extraction_run_id FROM letters "
-            "WHERE package_id = %s AND is_current AND extraction_run_id IS NOT NULL",
+            "WHERE package_id = %s AND is_current AND voided_at IS NULL "
+            "AND extraction_run_id IS NOT NULL",
             (package_id,),
         )
         runs = [row[0] for row in cur.fetchall()]
@@ -370,7 +371,7 @@ def recompute_threads(conn: psycopg.Connection, package_id: str) -> None:
         cur.execute(
             """
             SELECT id, letter_ref, letter_ref_normalized, dated, serial, subject
-            FROM letters WHERE package_id = %s AND is_current
+            FROM letters WHERE package_id = %s AND is_current AND voided_at IS NULL
             """,
             (package_id,),
         )
@@ -451,7 +452,7 @@ def recompute_threads(conn: psycopg.Connection, package_id: str) -> None:
             UPDATE threads t SET letter_count = 0
             WHERE t.package_id = %s
               AND NOT EXISTS (
-                  SELECT 1 FROM letters l WHERE l.thread_id = t.id AND l.is_current
+                  SELECT 1 FROM letters l WHERE l.thread_id = t.id AND l.is_current AND l.voided_at IS NULL
               )
               AND t.letter_count <> 0
             """,

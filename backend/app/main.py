@@ -626,7 +626,7 @@ def list_letters(package_id: str, request: Request) -> list[dict]:
             LEFT JOIN parties tp ON tp.id = l.to_party_id
             LEFT JOIN threads t ON t.id = l.thread_id
             LEFT JOIN documents d ON d.sha256 = l.document_sha256
-            WHERE l.package_id = %s AND l.is_current
+            WHERE l.package_id = %s AND l.is_current AND l.voided_at IS NULL
             ORDER BY l.serial
             """,
             (package_id,),
@@ -717,7 +717,7 @@ def list_documents(package_id: str, request: Request) -> list[dict]:
                          WHERE dp.document_sha256 = d.sha256) AS pages,
                        (SELECT count(*) FROM letters l
                          WHERE l.document_sha256 = d.sha256 AND l.package_id = %s
-                           AND l.is_current) AS letters,
+                           AND l.is_current AND l.voided_at IS NULL) AS letters,
                        er.status, er.error
                 FROM package_documents pd
                 JOIN documents d ON d.sha256 = pd.document_sha256
