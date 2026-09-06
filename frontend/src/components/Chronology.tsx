@@ -32,7 +32,7 @@ export function Chronology({
           <div key={letter.id}>
             {gap && (
               <div className={styles.gap}>
-                <span className={styles.gapFigure}>{gap.days} d</span>
+                <span className={styles.gapFigure}>{gap.days === null ? "—" : `${gap.days} d`}</span>
                 <span className={styles.gapEndpoints}>
                   {gap.fromRef} · {formatDate(gap.fromDated)} → {gap.toRef} ·{" "}
                   {formatDate(gap.toDated)}

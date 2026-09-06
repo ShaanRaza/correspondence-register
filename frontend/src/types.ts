@@ -6,7 +6,7 @@ export interface Letter {
   id: string;
   serial: number;
   letterRef: string;
-  dated: string; // YYYY-MM-DD
+  dated: string | null; // YYYY-MM-DD -- null when the model could not read a valid date
   received: string | null;
   from: PartyCode;
   to: PartyCode;

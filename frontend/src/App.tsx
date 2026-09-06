@@ -75,8 +75,11 @@ function App() {
 
   const visible = useMemo(() => {
     return letters.filter((l) => {
-      if (filters.dateFrom && l.dated < filters.dateFrom) return false;
-      if (filters.dateTo && l.dated > filters.dateTo) return false;
+      // A letter with no readable date cannot be known to fall inside a date
+      // range, so an active date filter excludes it rather than letting a
+      // string/null comparison silently decide either way.
+      if (filters.dateFrom && (!l.dated || l.dated < filters.dateFrom)) return false;
+      if (filters.dateTo && (!l.dated || l.dated > filters.dateTo)) return false;
 
       if (filters.chainageFrom || filters.chainageTo) {
         const m = parseChainageMetres(l.chainage);

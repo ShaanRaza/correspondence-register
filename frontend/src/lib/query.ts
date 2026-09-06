@@ -15,7 +15,7 @@ export interface PackageSummaryResult {
   letterCount: number;
   needsReviewCount: number;
   threadCount: number;
-  spanDays: number;
+  spanDays: number | null;
 }
 
 export interface LetterHit {

@@ -25,7 +25,7 @@ export function LinearTimeline({
           <div key={letter.id}>
             {gap && (
               <div className={styles.gapWrap}>
-                <span className={styles.gapPill}>{gap.days} d</span>
+                <span className={styles.gapPill}>{gap.days === null ? "—" : `${gap.days} d`}</span>
                 <span className={styles.gapCaption}>
                   {gap.fromRef} ({formatDate(gap.fromDated)}) → {gap.toRef} (
                   {formatDate(gap.toDated)})

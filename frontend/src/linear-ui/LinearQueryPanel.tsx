@@ -28,7 +28,7 @@ function ResultView({ result }: { result: QueryResult | null }) {
         <div className={styles.summaryRow}>
           <span className={styles.summaryKey}>Period</span>
           <span>
-            {formatDate(pkg.periodFrom)} – {formatDate(pkg.periodTo)} ({spanDays} d)
+            {formatDate(pkg.periodFrom)} – {formatDate(pkg.periodTo)} ({spanDays === null ? "span unknown" : `${spanDays} d`})
           </span>
         </div>
         <div className={styles.summaryRow}>

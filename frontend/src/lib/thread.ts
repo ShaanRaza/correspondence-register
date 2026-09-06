@@ -2,11 +2,12 @@ import type { Letter } from "../types";
 import { daysBetween } from "./dates";
 
 export interface ThreadGap {
-  days: number;
+  // null when either endpoint's date is unknown -- see daysBetween.
+  days: number | null;
   fromRef: string;
-  fromDated: string;
+  fromDated: string | null;
   toRef: string;
-  toDated: string;
+  toDated: string | null;
 }
 
 /** Chronological order: by the date on the letterhead, oldest first.
