@@ -58,6 +58,11 @@ CREATE TABLE users (
     -- Google's stable subject id. Kept alongside the email because a person can
     -- change their Google display email; the subject never changes.
     google_sub    text UNIQUE,
+    -- Signing in is open; UPLOADING is what costs money, because every document
+    -- spends the server's model credits. So the gate sits there instead of at
+    -- the door, and it is recorded per ACCOUNT rather than per browser -- the
+    -- code is entered once and never again, on any device.
+    upload_unlocked boolean NOT NULL DEFAULT false,
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 

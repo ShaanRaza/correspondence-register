@@ -31,6 +31,18 @@ export interface Session {
   packageId: string | null;
   /** Whether the server has Google credentials configured. */
   googleEnabled?: boolean;
+  /** Whether THIS account may upload. Signing in is open; uploading spends the
+   *  server's model credits, so it is the action behind the access code. */
+  uploadUnlocked?: boolean;
+}
+
+/** Exchanges the access code for a permanent unlock on this account. Stored
+ *  server-side against the account, so it is asked once and never again --
+ *  on any device, after any sign-out. */
+export async function unlockUploads(code: string): Promise<void> {
+  const res = await postJson("/api/auth/unlock", { code });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Could not unlock (${res.status})`);
 }
 
 /** Full-page redirect, not fetch: OAuth is a browser navigation to Google.

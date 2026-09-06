@@ -95,6 +95,10 @@ _ADDITIVE_MIGRATIONS = (
     "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub text",
     """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS upload_unlocked boolean
+        NOT NULL DEFAULT false
+    """,
+    """
     CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub
         ON users (google_sub) WHERE google_sub IS NOT NULL
     """,
@@ -114,6 +118,13 @@ def apply_additive_migrations(database_url: str) -> None:
                 """
             )
             had_source_column = cur.fetchone() is not None
+            cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'upload_unlocked'
+                """
+            )
+            had_unlock_column = cur.fetchone() is not None
 
             for statement in _ADDITIVE_MIGRATIONS:
                 cur.execute(statement)
@@ -133,6 +144,17 @@ def apply_additive_migrations(database_url: str) -> None:
                 print(
                     f"[bootstrap] marked {cur.rowcount} pre-existing resolved "
                     "citation(s) as human-confirmed (unattributable, protected)",
+                    flush=True,
+                )
+
+            if not had_unlock_column:
+                # Accounts that existed BEFORE uploading was gated were able to
+                # upload, and taking that away on an upgrade would lock people --
+                # the owner included -- out of their own register's main action.
+                # New accounts still start locked.
+                cur.execute("UPDATE users SET upload_unlocked = true")
+                print(
+                    f"[bootstrap] kept upload access for {cur.rowcount} pre-existing account(s)",
                     flush=True,
                 )
 

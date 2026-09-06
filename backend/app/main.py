@@ -359,13 +359,16 @@ def google_callback(request: Request, code: str = "", state: str = "") -> Respon
             )
             row = cur.fetchone()
             if row is None:
-                # New account: still gated by the invite code, or this instance
-                # would be open to anyone with a Google account.
-                if settings.app_password and invite != settings.app_password:
-                    return RedirectResponse("/?error=invite", status_code=302)
+                # Signing in is open: a new account gets an empty private
+                # register and can do nothing that costs anything. The gate that
+                # matters sits on UPLOAD, which is what spends model credits.
+                # An invite in the link still unlocks uploading immediately, so
+                # an invited person never sees a prompt at all.
+                unlocked = bool(settings.app_password) and invite == settings.app_password
                 cur.execute(
-                    "INSERT INTO users (email, google_sub) VALUES (%s, %s) RETURNING id",
-                    (email, google_sub),
+                    "INSERT INTO users (email, google_sub, upload_unlocked) "
+                    "VALUES (%s, %s, %s) RETURNING id",
+                    (email, google_sub, unlocked or not settings.app_password),
                 )
                 (user_id,) = cur.fetchone()
                 _create_register_for(conn, str(user_id), email)
@@ -408,6 +411,43 @@ def logout(request: Request, response: Response) -> dict:
     return {"signedIn": False}
 
 
+def _upload_unlocked(conn: psycopg.Connection, user_id: str) -> bool:
+    """Whether this account may upload. Uploading spends the server's model
+    credits, so it is the one action worth gating; reading your own (empty)
+    register is not."""
+    settings = get_settings()
+    if not settings.app_password:
+        return True  # no code configured: nothing to unlock
+    with conn.cursor() as cur:
+        cur.execute("SELECT upload_unlocked FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+    return bool(row and row[0])
+
+
+class UnlockBody(BaseModel):
+    code: str
+
+
+@app.post("/api/auth/unlock")
+def unlock_uploads(body: UnlockBody, request: Request) -> dict:
+    """Exchanges the access code for a permanent unlock on THIS account.
+
+    Recorded against the account, not the browser, so it is entered once and
+    never again -- on any device, after any sign-out.
+    """
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        if not settings.app_password:
+            return {"uploadUnlocked": True}
+        if body.code.strip() != settings.app_password:
+            raise HTTPException(status_code=403, detail="That code is not correct.")
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET upload_unlocked = true WHERE id = %s", (user_id,))
+        conn.commit()
+    return {"uploadUnlocked": True}
+
+
 @app.get("/api/auth/me")
 def me(request: Request) -> dict:
     settings = get_settings()
@@ -417,10 +457,12 @@ def me(request: Request) -> dict:
     with psycopg.connect(settings.database_url) as conn:
         user = user_for_token(conn, request.cookies.get(SESSION_COOKIE))
         if user is None:
-            return {"signedIn": False, "email": None, "packageId": None, "googleEnabled": google}
+            return {"signedIn": False, "email": None, "packageId": None,
+                    "googleEnabled": google, "uploadUnlocked": False}
         user_id, email = user
         return {"signedIn": True, "email": email,
-                "packageId": package_for_user(conn, user_id), "googleEnabled": google}
+                "packageId": package_for_user(conn, user_id), "googleEnabled": google,
+                "uploadUnlocked": _upload_unlocked(conn, user_id)}
 
 
 def _ingest_blocking(
@@ -478,6 +520,15 @@ async def upload_document(
     with psycopg.connect(settings.database_url) as conn:
         user_id, _ = require_user(request, conn)
         assert_owns_package(conn, user_id, package_id)
+        if not _upload_unlocked(conn, user_id):
+            # Signing in is open, but uploading spends the server's model
+            # credits, so this is where the access code is required. The
+            # "upload_locked:" prefix is a stable marker the UI keys on to show
+            # the code prompt rather than a generic error.
+            raise HTTPException(
+                status_code=403,
+                detail="upload_locked: enter the access code to enable uploads for this account.",
+            )
     # A key typed into the browser (per-request, from Form) takes priority over
     # the server's own .env -- this lets a second person use their own OpenAI
     # quota against a shared instance without ever touching the server's

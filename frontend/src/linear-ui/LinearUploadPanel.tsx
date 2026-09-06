@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { getStoredOpenAIKey, setStoredOpenAIKey } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { fetchSession, getStoredOpenAIKey, setStoredOpenAIKey, unlockUploads } from "../lib/api";
 import styles from "./LinearUploadPanel.module.css";
 
 export function LinearUploadPanel({
@@ -19,6 +19,30 @@ export function LinearUploadPanel({
   const [dragOver, setDragOver] = useState(false);
   const [apiKey, setApiKey] = useState(() => getStoredOpenAIKey());
   const [showKey, setShowKey] = useState(false);
+  // null while unknown, so the dropzone never flashes before we know whether
+  // this account is allowed to use it.
+  const [unlocked, setUnlocked] = useState<boolean | null>(null);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    fetchSession().then((s) => setUnlocked(s.uploadUnlocked !== false));
+  }, [open]);
+
+  const submitCode = async () => {
+    setUnlocking(true);
+    setCodeError(null);
+    try {
+      await unlockUploads(code);
+      setUnlocked(true);
+    } catch (e) {
+      setCodeError((e as Error).message);
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -47,6 +71,40 @@ export function LinearUploadPanel({
           </button>
         </div>
         <div className={styles.body}>
+          {unlocked === false && (
+            <div className={styles.apiKeyBlock}>
+              <label className={styles.apiKeyLabel}>
+                Access code{" "}
+                <span className={styles.apiKeyOptional}>(once per account)</span>
+              </label>
+              <div className={styles.apiKeyRow}>
+                <input
+                  className={styles.apiKeyInput}
+                  type="text"
+                  placeholder="Ask whoever shared this register"
+                  value={code}
+                  autoFocus
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !unlocking && code) submitCode(); }}
+                />
+                <button
+                  type="button"
+                  className={styles.apiKeyToggle}
+                  onClick={submitCode}
+                  disabled={unlocking || !code}
+                >
+                  {unlocking ? "…" : "Unlock"}
+                </button>
+              </div>
+              <div className={styles.apiKeyHint}>
+                Uploading uses the server's model credits, so it needs a code. You only
+                enter it once — it is remembered for your account on every device.
+              </div>
+              {codeError && (
+                <div className={styles.apiKeyHint} style={{ color: "#dc2626" }}>{codeError}</div>
+              )}
+            </div>
+          )}
           <input
             ref={fileInput}
             type="file"
@@ -58,6 +116,7 @@ export function LinearUploadPanel({
               e.target.value = "";
             }}
           />
+          {unlocked !== false && (
           <div
             className={styles.dropzone}
             style={dragOver ? { borderColor: "var(--l-blue)", background: "var(--l-surface)" } : undefined}
@@ -76,7 +135,9 @@ export function LinearUploadPanel({
             <div className={styles.dropzoneTitle}>Drop PDF files here</div>
             <div>or click to browse</div>
           </div>
+          )}
 
+          {unlocked !== false && (
           <div className={styles.apiKeyBlock}>
             <label className={styles.apiKeyLabel} htmlFor="openai-api-key">
               OpenAI API key <span className={styles.apiKeyOptional}>(optional — uses your own quota)</span>
@@ -111,6 +172,7 @@ export function LinearUploadPanel({
               .
             </div>
           </div>
+          )}
 
           {status && <div className={styles.note}>{status}</div>}
         </div>
