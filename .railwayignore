@@ -1,0 +1,13 @@
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+frontend/dist
+# Real uploaded correspondence and derived page images -- never upload these.
+backend/storage
+backend/storage_shared
+.git
+.env
+.env.*
+!.env.example
+**/.DS_Store

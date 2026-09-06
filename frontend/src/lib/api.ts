@@ -3,9 +3,28 @@ import type { ExtractedFieldProvenance, Letter, PackageInfo } from "../types";
 // The package seeded by `backend/scripts/seed_upload_package.py` for real uploaded
 // documents to ingest against -- deliberately not the fictional "NH-44 PKG-3" used
 // in the design fixtures, so real evidence is never silently blended with sample data.
-// Overridable per deployment: each deployed backend has its own fresh database
-// with its own seeded package_id, distinct from your local one.
-export const UPLOAD_PACKAGE_ID = import.meta.env.VITE_UPLOAD_PACKAGE_ID || "51299903-aec7-43c6-9ad0-cc2043578a0d";
+//
+// `let`, not `const`, and resolved at runtime by bootstrapConfig() below. ES module
+// exports are live bindings, so reassigning here updates every importer. Baking the
+// id in at build time made each deployment a two-phase dance -- seed the database,
+// read the new id, rebuild, redeploy -- and a stale bundle then pointed a live UI at
+// a package that no longer existed. The build-time value remains the fallback for
+// local dev, where the seeded id is stable and the backend may not be running yet.
+export let UPLOAD_PACKAGE_ID = import.meta.env.VITE_UPLOAD_PACKAGE_ID || "51299903-aec7-43c6-9ad0-cc2043578a0d";
+
+/** Resolves the package id from the backend before the app renders. Failure is
+ *  non-fatal: the build-time fallback stands, and the app surfaces the real
+ *  error on its first data request rather than dying at a blank screen. */
+export async function bootstrapConfig(): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/api/config`);
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json.packageId) UPLOAD_PACKAGE_ID = json.packageId;
+  } catch {
+    // Backend unreachable -- keep the fallback.
+  }
+}
 
 // Configurable per deployment. `??` rather than `||` so an explicitly EMPTY
 // value is honoured and means "same origin": every request becomes a relative

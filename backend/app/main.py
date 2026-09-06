@@ -11,6 +11,7 @@ here on purpose.
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psycopg
@@ -21,12 +22,28 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from .bootstrap import ensure_schema
 from .config import get_settings
 from .pipeline.ingest import IngestResult, ingest_pdf
 from .pipeline.link import recompute_threads
 from .pipeline.storage import LocalBlobStore
 
-app = FastAPI(title="Correspondence Register API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Provision a blank database on first boot (see bootstrap.ensure_schema).
+
+    Deliberately non-fatal: if this fails the app still starts, so the failure is
+    readable in the platform's logs and on the health endpoint instead of a
+    container that crash-loops before printing why.
+    """
+    try:
+        ensure_schema(get_settings().database_url)
+    except Exception as e:  # noqa: BLE001 -- surfaced, not swallowed
+        print(f"[bootstrap] FAILED: {type(e).__name__}: {e}", flush=True)
+    yield
+
+
+app = FastAPI(title="Correspondence Register API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,7 +77,8 @@ async def require_app_password(request: Request, call_next):
     # header -- gating them would make the page unloadable and leave nowhere to
     # type the password. The bundle is not the secret; the register data is,
     # and every route that returns it still requires the header.
-    if not settings.app_password or not path.startswith("/api/") or path == "/api/health":
+    if (not settings.app_password or not path.startswith("/api/")
+            or path in ("/api/health", "/api/config")):
         return await call_next(request)
     if request.headers.get("x-app-password") != settings.app_password:
         return Response(status_code=401, content='{"detail":"Missing or incorrect app password."}',
@@ -81,6 +99,34 @@ DEFAULT_PACKAGE_CONTEXT = (
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/api/config")
+def config() -> dict:
+    """Runtime configuration for the frontend.
+
+    The package id used to be baked into the JS bundle at build time, which made
+    every deployment a two-phase dance -- seed the database, read the new id,
+    rebuild the frontend, redeploy -- and a stale bundle then pointed a live UI
+    at a package that no longer existed. Serving it at runtime means the same
+    built image works against any database it is pointed at.
+
+    Ungated on purpose: this returns an opaque package UUID, exactly what the
+    public JS bundle already contained, and it has to be readable BEFORE the
+    password is entered because the lock screen needs somewhere to verify
+    against. Every route that returns actual register content stays gated.
+    """
+    settings = get_settings()
+    package_id = os.environ.get("UPLOAD_PACKAGE_ID")
+    if not package_id:
+        # Fall back to the package this database actually holds, so a fresh
+        # deployment works with no extra configuration.
+        with psycopg.connect(settings.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM packages ORDER BY created_at LIMIT 1")
+                row = cur.fetchone()
+        package_id = str(row[0]) if row else None
+    return {"packageId": package_id}
 
 
 def _ingest_blocking(

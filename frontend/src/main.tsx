@@ -27,11 +27,16 @@ import "@fontsource/ibm-plex-sans/600.css";
 
 import Root from "./Root.tsx";
 import { PasswordGate } from "./PasswordGate.tsx";
+import { bootstrapConfig } from "./lib/api";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <PasswordGate>
-      <Root />
-    </PasswordGate>
-  </StrictMode>,
-);
+// Resolve the package id from the backend before first render, so no component
+// ever reads a stale build-time id. bootstrapConfig never rejects.
+bootstrapConfig().then(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <PasswordGate>
+        <Root />
+      </PasswordGate>
+    </StrictMode>,
+  );
+});
