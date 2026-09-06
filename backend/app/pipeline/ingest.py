@@ -18,6 +18,7 @@ the design for when that changes.
 
 from __future__ import annotations
 
+import re
 import time
 import unicodedata
 from dataclasses import dataclass
@@ -43,6 +44,30 @@ PIPELINE_VERSION_ID = "v3"
 def normalize_ref(ref: str) -> str:
     ref = unicodedata.normalize("NFC", ref)
     return " ".join(ref.split()).upper()
+
+
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _as_date(value) -> str | None:
+    """A date the database will accept, or None.
+
+    The model is asked for null when a date is absent and usually obliges, but
+    it also emits the literal STRING "null" -- which is not a date, and reached
+    Postgres as one: `invalid input syntax for type date: "null"`. That killed
+    the whole request, so one unreadable date lost the entire document rather
+    than just that field.
+
+    Anything that is not a plain ISO date is discarded here. A letter with no
+    readable date is a normal outcome the register already handles; a letter
+    lost to a 500 is not.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"null", "none", "n/a", "-", "unknown"}:
+        return None
+    return text if _ISO_DATE.match(text) else None
 
 
 def _fetch_parties(conn: psycopg.Connection, package_id: str) -> dict[str, str]:
@@ -291,7 +316,7 @@ def ingest_pdf(
                 "raw": raw,
                 "letter_ref": ref_verbatim,
                 "letter_ref_normalized": normalize_ref(ref_verbatim or "") or None,
-                "dated": (raw.get("dated") or {}).get("value"),
+                "dated": _as_date((raw.get("dated") or {}).get("value")),
                 "page_from": raw.get("page_from", 1),
                 "page_to": raw.get("page_to", 1),
             }

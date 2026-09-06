@@ -20,12 +20,30 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [needsInvite, setNeedsInvite] = useState(false);
 
   useEffect(() => {
-    fetchSession().then(setSession);
+    fetchSession().then((s) => {
+      setSession(s);
+      // Drop ?invite / ?error once they have served their purpose, so the URL
+      // in the address bar (and anything the user bookmarks or shares) is the
+      // plain app rather than a link carrying an invite code around.
+      if (s.signedIn && window.location.search) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    });
     const params = new URLSearchParams(window.location.search);
     const fromLink = params.get("invite");
     if (fromLink) setInvite(fromLink);
     // Set by the OAuth callback when a new account arrived without an invite.
     if (params.get("error") === "invite") setNeedsInvite(true);
+
+    // Coming BACK to this page from history does not re-run the app: browsers
+    // restore the previous render from the back/forward cache, which showed the
+    // sign-in screen again to someone who is already signed in. Re-checking the
+    // session on restore is what makes "signed in stays signed in".
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) fetchSession().then(setSession);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   if (session === null) return null;              // still checking

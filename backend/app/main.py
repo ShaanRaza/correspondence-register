@@ -380,7 +380,17 @@ def google_callback(request: Request, code: str = "", state: str = "") -> Respon
         raw_token, _ = create_session(conn, str(user_id))
         conn.commit()
 
-    response = RedirectResponse("/", status_code=302)
+    # location.replace, not a 302. A redirect leaves THIS callback URL in the
+    # browser's history, so pressing Back from the register re-entered it -- and
+    # its one-time state cookie is already spent, so the user landed on an error
+    # after successfully signing in. Replacing the entry means Back skips over
+    # the whole sign-in round trip entirely.
+    html = (
+        "<!doctype html><meta charset=utf-8><title>Signing you in…</title>"
+        "<script>location.replace('/')</script>"
+        "<noscript><meta http-equiv=refresh content='0;url=/'></noscript>"
+    )
+    response = Response(content=html, media_type="text/html")
     _set_session_cookie(response, raw_token)
     response.delete_cookie(_OAUTH_STATE_COOKIE, path="/")
     return response

@@ -110,6 +110,7 @@ export function LinearApp() {
     let failed = 0;
     let done = 0;
     let lastMessage = "";
+    const failures: string[] = [];
 
     // Three at a time. Each document is an independent OCR pass and its own LLM
     // call, so nothing about the EXTRACTION depends on the others -- the results
@@ -134,6 +135,10 @@ export function LinearApp() {
         } catch (e) {
           failed++;
           lastMessage = `${file.name}: failed — ${(e as Error).message}`;
+          // Kept, not just shown: with three uploads in flight the next result
+          // overwrites the status line, so a failure would otherwise vanish and
+          // leave only a count with no way to learn WHICH file or why.
+          failures.push(`${file.name} — ${(e as Error).message}`);
         }
         done++;
         setUploadStatus(
@@ -150,7 +155,12 @@ export function LinearApp() {
     );
 
     setUploadStatus(
-      list.length === 1 ? lastMessage : `Done: ${succeeded} of ${list.length} succeeded${failed ? `, ${failed} failed` : ""}`,
+      list.length === 1 && failures.length === 0
+        ? lastMessage
+        : [
+            `Done: ${succeeded} of ${list.length} succeeded${failed ? `, ${failed} failed` : ""}`,
+            ...failures.map((f) => `• ${f}`),
+          ].join("\n"),
     );
     setUploading(false);
     setDocsRefresh((n) => n + 1);
