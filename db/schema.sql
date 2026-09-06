@@ -40,6 +40,41 @@ CREATE TYPE review_action      AS ENUM ('verified','rejected','corrected','flagg
 
 -- ---------------------------------------------------------------- org
 
+-- ---------------------------------------------------------------- accounts
+
+-- One register per person. Identity exists so a register can be PRIVATE to its
+-- owner, and so an evidentiary decision can name the person who made it --
+-- "confirmed by a human" is weaker than "confirmed by this account".
+CREATE TABLE users (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- Stored lowercased; the app normalizes before writing, so uniqueness is
+    -- case-insensitive without depending on the citext extension.
+    email         text NOT NULL UNIQUE,
+    -- argon2id. The plaintext is never stored, logged, or returned anywhere.
+    -- NULL for an account that only ever signs in with Google: there is no
+    -- password to store, and inventing a placeholder one would be worse than
+    -- recording its absence honestly.
+    password_hash text,
+    -- Google's stable subject id. Kept alongside the email because a person can
+    -- change their Google display email; the subject never changes.
+    google_sub    text UNIQUE,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- Server-side sessions rather than self-contained tokens, so signing out (or
+-- revoking a compromised session) takes effect immediately instead of waiting
+-- for an expiry to elapse.
+CREATE TABLE sessions (
+    -- sha256 of the cookie value. The raw token exists only in the user's
+    -- browser: a leaked database dump cannot be replayed as a login.
+    token_hash text PRIMARY KEY,
+    user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL
+);
+CREATE INDEX sessions_user ON sessions (user_id);
+CREATE INDEX sessions_expiry ON sessions (expires_at);
+
 CREATE TABLE contractors (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name        text NOT NULL,
@@ -62,6 +97,10 @@ CREATE TABLE packages (
     ref_pattern         text,                         -- regex letter refs must match
     next_serial         bigint NOT NULL DEFAULT 1,    -- bumped under row lock at S6, same transaction as the insert
     created_at          timestamptz NOT NULL DEFAULT now(),
+    -- The account this register belongs to. Nullable only so a package created
+    -- before accounts existed keeps working; every query that returns register
+    -- content filters on it.
+    owner_user_id       uuid REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE (contractor_id, contract_no)
 );
 
@@ -524,6 +563,7 @@ CREATE TABLE citation_aliases (
 );
 CREATE INDEX citation_aliases_lookup ON citation_aliases (package_id, cited_ref_normalized);
 
+CREATE INDEX packages_owner ON packages (owner_user_id);
 CREATE INDEX citations_cited  ON citations (cited_letter_id);
 CREATE INDEX citations_citing ON citations (citing_letter_id);
 -- completeness signal: references cited but not held

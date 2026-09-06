@@ -12,64 +12,106 @@ import type { ExtractedFieldProvenance, Letter, PackageInfo } from "../types";
 // local dev, where the seeded id is stable and the backend may not be running yet.
 export let UPLOAD_PACKAGE_ID = import.meta.env.VITE_UPLOAD_PACKAGE_ID || "51299903-aec7-43c6-9ad0-cc2043578a0d";
 
-/** Resolves the package id from the backend before the app renders. Failure is
- *  non-fatal: the build-time fallback stands, and the app surfaces the real
- *  error on its first data request rather than dying at a blank screen. */
-export async function bootstrapConfig(): Promise<void> {
-  try {
-    const res = await fetch(`${API_BASE}/api/config`);
-    if (!res.ok) return;
-    const json = await res.json();
-    if (json.packageId) UPLOAD_PACKAGE_ID = json.packageId;
-  } catch {
-    // Backend unreachable -- keep the fallback.
-  }
-}
-
 // Configurable per deployment. `??` rather than `||` so an explicitly EMPTY
 // value is honoured and means "same origin": every request becomes a relative
-// URL. That is what lets one process serve the UI and the API behind a single
-// tunnel whose hostname is random and changes on restart -- the bundle never
-// has to know its own public address, and there is no CORS in play. Unset (the
-// local-dev case) still falls back to the separate backend port.
+// URL, which is what lets one process serve the UI and the API together.
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
-// Shared-password gate (see backend/app/main.py's `require_app_password`
-// middleware) -- not real per-user auth, just a stop against a random
-// link-holder touching a deployed instance. Stored per-browser, attached to
-// every request; a no-op when the backend has no APP_PASSWORD configured.
-const APP_PASSWORD_STORAGE = "correspondence_register_app_password";
-
-export function getStoredAppPassword(): string {
-  try {
-    return localStorage.getItem(APP_PASSWORD_STORAGE) || "";
-  } catch {
-    return "";
-  }
-}
-
-export function setStoredAppPassword(password: string): void {
-  try {
-    if (password) localStorage.setItem(APP_PASSWORD_STORAGE, password);
-    else localStorage.removeItem(APP_PASSWORD_STORAGE);
-  } catch {
-    // Private browsing / storage disabled.
-  }
-}
-
+// Session cookie auth. The cookie is httpOnly, so it is deliberately invisible
+// to this code -- there is nothing to read or attach by hand. `credentials`
+// makes the browser send it, which also covers local dev where the frontend and
+// API sit on different ports.
 function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const password = getStoredAppPassword();
-  const headers = new Headers(init.headers);
-  if (password) headers.set("X-App-Password", password);
-  return fetch(`${API_BASE}${path}`, { ...init, headers });
+  return fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
 }
 
-/** Used by the lock screen to validate a password before letting the app render. */
-export async function checkAppPassword(password: string): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/api/packages/${UPLOAD_PACKAGE_ID}`, {
-    headers: { "X-App-Password": password },
+export interface Session {
+  signedIn: boolean;
+  email: string | null;
+  packageId: string | null;
+  /** Whether the server has Google credentials configured. */
+  googleEnabled?: boolean;
+}
+
+/** Full-page redirect, not fetch: OAuth is a browser navigation to Google.
+ *  The invite code travels in `state` so a NEW account is still gated by it. */
+export function googleSignInUrl(inviteCode: string): string {
+  return `${API_BASE}/api/auth/google/start?invite=${encodeURIComponent(inviteCode)}`;
+}
+
+function postJson(path: string, body: unknown): Promise<Response> {
+  return apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  return res.status !== 401;
+}
+
+export async function fetchSession(): Promise<Session> {
+  try {
+    const res = await apiFetch("/api/auth/me");
+    if (!res.ok) return { signedIn: false, email: null, packageId: null };
+    return await res.json();
+  } catch {
+    return { signedIn: false, email: null, packageId: null };
+  }
+}
+
+export async function signUp(email: string, password: string, inviteCode: string): Promise<Session> {
+  const res = await postJson("/api/auth/signup", { email, password, inviteCode });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Sign up failed (${res.status})`);
+  UPLOAD_PACKAGE_ID = body.packageId;
+  return { signedIn: true, email: body.email, packageId: body.packageId };
+}
+
+export async function signIn(email: string, password: string): Promise<Session> {
+  const res = await postJson("/api/auth/login", { email, password });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Sign in failed (${res.status})`);
+  UPLOAD_PACKAGE_ID = body.packageId;
+  return { signedIn: true, email: body.email, packageId: body.packageId };
+}
+
+export async function signOut(): Promise<void> {
+  await postJson("/api/auth/logout", {});
+}
+
+/** One document's ingestion outcome, for the upload history. */
+export interface DocumentRecord {
+  sha256: string;
+  filename: string;
+  byteSize: number;
+  ingestedAt: string;
+  pages: number;
+  letters: number;
+  status: string;
+  error: string | null;
+}
+
+export async function fetchDocuments(packageId: string): Promise<DocumentRecord[]> {
+  const res = await apiFetch(`/api/packages/${packageId}/documents`);
+  if (!res.ok) throw new Error(`Failed to load documents (${res.status})`);
+  return res.json();
+}
+
+/** Same-origin link; the session cookie rides along automatically. */
+export function originalPdfUrl(sha256: string): string {
+  return `${API_BASE}/api/documents/${sha256}/original`;
+}
+
+/** Resolves the signed-in account's register before the app renders. Failure is
+ *  non-fatal: the sign-in screen renders and the real error surfaces there. */
+export async function bootstrapConfig(): Promise<Session> {
+  try {
+    const res = await fetch(`${API_BASE}/api/config`, { credentials: "include" });
+    if (!res.ok) return { signedIn: false, email: null, packageId: null };
+    const json = await res.json();
+    if (json.packageId) UPLOAD_PACKAGE_ID = json.packageId;
+    return { signedIn: !!json.signedIn, email: json.email ?? null, packageId: json.packageId ?? null };
+  } catch {
+    return { signedIn: false, email: null, packageId: null };
+  }
 }
 
 export interface UploadResult {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LinearTitleBar } from "./LinearTitleBar";
+import { LinearDocumentsPanel } from "./LinearDocumentsPanel";
 import { LinearFilterBand } from "./LinearFilterBand";
 import { LinearRegister } from "./LinearRegister";
 import { LinearThreadScreen } from "./LinearThreadScreen";
@@ -37,6 +38,9 @@ export function LinearApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [view, setView] = useState<View>({ screen: "register" });
 
+  const [docsOpen, setDocsOpen] = useState(false);
+  // Bumped when a batch finishes so the documents list reflects it.
+  const [docsRefresh, setDocsRefresh] = useState(0);
   const [queryText, setQueryText] = useState("");
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [queryPanelOpen, setQueryPanelOpen] = useState(false);
@@ -149,6 +153,7 @@ export function LinearApp() {
       list.length === 1 ? lastMessage : `Done: ${succeeded} of ${list.length} succeeded${failed ? `, ${failed} failed` : ""}`,
     );
     setUploading(false);
+    setDocsRefresh((n) => n + 1);
   };
 
   const visible = useMemo(() => {
@@ -193,6 +198,12 @@ export function LinearApp() {
 
   const overlays = (
     <>
+      <LinearDocumentsPanel
+        open={docsOpen}
+        onClose={() => setDocsOpen(false)}
+        packageId={UPLOAD_PACKAGE_ID}
+        refreshKey={docsRefresh}
+      />
       <LinearQueryPanel
         open={queryPanelOpen}
         onClose={() => setQueryPanelOpen(false)}
@@ -237,6 +248,7 @@ export function LinearApp() {
         onQueryTextChange={setQueryText}
         onSubmitQuery={submitQuery}
         suggestions={suggestions}
+        onOpenDocuments={() => setDocsOpen(true)}
         onOpenUpload={() => setUploadOpen(true)}
         uploadStatus={uploadStatus}
         onOpenReview={live ? () => setCitationReviewOpen(true) : undefined}

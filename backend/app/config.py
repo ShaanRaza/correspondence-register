@@ -25,6 +25,13 @@ class Settings:
     # actually deploying somewhere reachable by more than just you.
     app_password: str | None
     allowed_origin: str
+    # Google sign-in. Unset simply hides the option -- the app works
+    # entirely on email + password without it.
+    google_client_id: str | None
+    google_client_secret: str | None
+    # Public origin, for building the OAuth redirect URI. Derived from the
+    # request when unset, which is correct behind Railway's proxy.
+    public_base_url: str | None
 
 
 def get_settings() -> Settings:
@@ -36,4 +43,7 @@ def get_settings() -> Settings:
         storage_root=Path(os.environ.get("STORAGE_ROOT", str(_BACKEND_ROOT / "storage"))).resolve(),
         app_password=os.environ.get("APP_PASSWORD") or None,
         allowed_origin=os.environ.get("ALLOWED_ORIGIN", "http://localhost:5173"),
+        google_client_id=os.environ.get("GOOGLE_CLIENT_ID") or None,
+        google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET") or None,
+        public_base_url=(os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/") or None,
     )

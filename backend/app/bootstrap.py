@@ -69,6 +69,35 @@ _ADDITIVE_MIGRATIONS = (
     CREATE INDEX IF NOT EXISTS citation_aliases_lookup
         ON citation_aliases (package_id, cited_ref_normalized)
     """,
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        email         text NOT NULL UNIQUE,
+        password_hash text NOT NULL,
+        created_at    timestamptz NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sessions (
+        token_hash text PRIMARY KEY,
+        user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        expires_at timestamptz NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id)",
+    "CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions (expires_at)",
+    """
+    ALTER TABLE packages ADD COLUMN IF NOT EXISTS owner_user_id uuid
+        REFERENCES users(id) ON DELETE CASCADE
+    """,
+    "CREATE INDEX IF NOT EXISTS packages_owner ON packages (owner_user_id)",
+    "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub text",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub
+        ON users (google_sub) WHERE google_sub IS NOT NULL
+    """,
 )
 
 

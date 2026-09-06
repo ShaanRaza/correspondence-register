@@ -11,16 +11,26 @@ here on purpose.
 from __future__ import annotations
 
 import os
+import secrets
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 import psycopg
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from .auth import (
+    SESSION_COOKIE, assert_owns_package, create_session, delete_session,
+    assert_owns_citation, assert_owns_document, assert_owns_letter,
+    hash_password, normalize_email, package_for_user, require_user,
+    user_for_token, verify_password,
+)
 from .bootstrap import ensure_schema
 from .pipeline.extract import make_client, resolve_base_url, resolve_model
 from .config import get_settings
@@ -53,37 +63,46 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def require_app_password(request: Request, call_next):
-    """Shared-password gate for when this is deployed somewhere reachable by
-    more than just you -- there is no real user model here, this only stops a
-    random link-holder from touching an exposed instance. A no-op locally
-    (APP_PASSWORD unset means the gate is off, which is the default).
+# Routes reachable without a session. Everything else requires one.
+#   health/config - needed before sign-in (config carries no register content)
+#   auth/*        - the way in
+_PUBLIC_API_PATHS = {
+    "/api/health", "/api/config",
+    "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/api/auth/me",
+    # The OAuth round-trip happens BEFORE a session exists -- gating these would
+    # make Google sign-in impossible for anyone not already signed in.
+    "/api/auth/google/start", "/api/auth/google/callback",
+}
 
-    `@app.middleware("http")` registers AFTER CORSMiddleware but runs BEFORE it
-    on the way in (Starlette wraps middleware in reverse-registration order) --
-    this must let OPTIONS preflight through untouched, or a browser's preflight
-    gets a 401 with no Access-Control-Allow-Origin header at all and the real
-    request never gets sent. Preflight carries no custom headers by design, so
-    there's nothing to check here anyway; CORSMiddleware's own allow_origins
-    still gates who the browser lets the real request return a response to."""
+
+@app.middleware("http")
+async def require_session(request: Request, call_next):
+    """Blanket "must be signed in" for the API.
+
+    This is a coarse gate only. It proves a request HAS a session; it says
+    nothing about which register that session may read, so every route
+    returning register content additionally checks ownership. Registers are
+    private per account, and an id in a URL must never be enough to reach one.
+
+    Non-/api/ paths are unauthenticated on purpose: this process also serves the
+    built frontend, and those are ordinary browser navigations for the HTML and
+    JS. The bundle is not the secret -- the register is, and it stays behind
+    this gate.
+    """
     if request.method == "OPTIONS":
         return await call_next(request)
-    settings = get_settings()
     path = request.url.path
-    # Only the API is gated. When this process also serves the built frontend
-    # (FRONTEND_DIST, used for single-origin tunnelling), the HTML and asset
-    # requests are ordinary browser navigations that cannot carry a custom
-    # header -- gating them would make the page unloadable and leave nowhere to
-    # type the password. The bundle is not the secret; the register data is,
-    # and every route that returns it still requires the header.
-    if (not settings.app_password or not path.startswith("/api/")
-            or path in ("/api/health", "/api/config")):
+    if not path.startswith("/api/") or path in _PUBLIC_API_PATHS:
         return await call_next(request)
-    if request.headers.get("x-app-password") != settings.app_password:
-        return Response(status_code=401, content='{"detail":"Missing or incorrect app password."}',
-                         media_type="application/json")
+
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user = user_for_token(conn, request.cookies.get(SESSION_COOKIE))
+    if user is None:
+        return Response(status_code=401, content='{"detail":"Not signed in."}',
+                        media_type="application/json")
     return await call_next(request)
+
 
 DEFAULT_CONTRACT_CONDITIONS = (
     "No package-specific contract conditions have been loaded for this package yet. "
@@ -102,31 +121,296 @@ def health() -> dict:
 
 
 @app.get("/api/config")
-def config() -> dict:
-    """Runtime configuration for the frontend.
+def config(request: Request) -> dict:
+    """The signed-in account's own register id, or null when signed out.
 
-    The package id used to be baked into the JS bundle at build time, which made
-    every deployment a two-phase dance -- seed the database, read the new id,
-    rebuild the frontend, redeploy -- and a stale bundle then pointed a live UI
-    at a package that no longer existed. Serving it at runtime means the same
-    built image works against any database it is pointed at.
-
-    Ungated on purpose: this returns an opaque package UUID, exactly what the
-    public JS bundle already contained, and it has to be readable BEFORE the
-    password is entered because the lock screen needs somewhere to verify
-    against. Every route that returns actual register content stays gated.
+    Registers are private per account, so there is no longer a single global
+    package to hand out -- this returns only the caller's own. It stays reachable
+    without a session because the frontend loads before anyone has signed in;
+    signed out it discloses nothing.
     """
     settings = get_settings()
-    package_id = os.environ.get("UPLOAD_PACKAGE_ID")
-    if not package_id:
-        # Fall back to the package this database actually holds, so a fresh
-        # deployment works with no extra configuration.
+    with psycopg.connect(settings.database_url) as conn:
+        user = user_for_token(conn, request.cookies.get(SESSION_COOKIE))
+        google = bool(settings.google_client_id and settings.google_client_secret)
+        if user is None:
+            return {"packageId": None, "email": None, "signedIn": False, "googleEnabled": google}
+        user_id, email = user
+        return {"packageId": package_for_user(conn, user_id), "email": email,
+                "signedIn": True, "googleEnabled": google}
+
+
+class SignupBody(BaseModel):
+    email: str
+    password: str
+    inviteCode: str | None = None
+
+
+class LoginBody(BaseModel):
+    email: str
+    password: str
+
+
+def _set_session_cookie(response: Response, raw_token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE, raw_token,
+        httponly=True,      # unreadable from JavaScript, so XSS cannot steal it
+        secure=True,        # HTTPS only; Railway terminates TLS
+        samesite="lax",     # blocks cross-site use while keeping normal navigation
+        max_age=60 * 60 * 24 * 30,
+        path="/",
+    )
+
+
+def _create_register_for(conn: psycopg.Connection, user_id: str, email: str) -> str:
+    """Gives a new account its own empty register.
+
+    An existing UNOWNED package is adopted rather than left orphaned -- that is
+    the register uploaded before accounts existed, and it would otherwise become
+    unreachable. Only the first account can inherit it; everyone after gets a
+    fresh one.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM packages WHERE owner_user_id IS NULL ORDER BY created_at LIMIT 1"
+        )
+        orphan = cur.fetchone()
+        if orphan is not None:
+            cur.execute("UPDATE packages SET owner_user_id = %s WHERE id = %s", (user_id, orphan[0]))
+            return str(orphan[0])
+
+        # Its own contractor row, so the (contractor_id, contract_no) uniqueness
+        # never collides between two accounts.
+        cur.execute(
+            "INSERT INTO contractors (name, short_code) VALUES (%s, %s) RETURNING id",
+            (f"Register owner {email}", f"U{user_id.replace('-', '')[:10]}"),
+        )
+        (contractor_id,) = cur.fetchone()
+        cur.execute(
+            """
+            INSERT INTO packages (contractor_id, name, contract_no, authority, owner_user_id)
+            VALUES (%s, 'Correspondence Register', 'PKG-1', 'NHAI', %s) RETURNING id
+            """,
+            (contractor_id, user_id),
+        )
+        (package_id,) = cur.fetchone()
+        for role, name, code in (
+            ("contractor", "Contractor", "CTR"),
+            ("authority_engineer", "Authority Engineer", "AE"),
+        ):
+            cur.execute(
+                "INSERT INTO parties (package_id, role, name, short_code) VALUES (%s,%s,%s,%s) "
+                "ON CONFLICT DO NOTHING",
+                (package_id, role, name, code),
+            )
+    return str(package_id)
+
+
+@app.post("/api/auth/signup")
+def signup(body: SignupBody, response: Response) -> dict:
+    settings = get_settings()
+    email = normalize_email(body.email)
+    if "@" not in email or len(email) < 3:
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Use a password of at least 8 characters.")
+    # APP_PASSWORD doubles as the invite code: without it anyone who finds the
+    # URL could create an account on this instance. Unset means open signup,
+    # which is the local-development default.
+    if settings.app_password and body.inviteCode != settings.app_password:
+        raise HTTPException(status_code=403, detail="That invite code is not correct.")
+
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM users WHERE email = %s", (email,))
+            if cur.fetchone() is not None:
+                raise HTTPException(status_code=409, detail="An account already exists for that email.")
+            cur.execute(
+                "INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id",
+                (email, hash_password(body.password)),
+            )
+            (user_id,) = cur.fetchone()
+        package_id = _create_register_for(conn, str(user_id), email)
+        raw_token, _ = create_session(conn, str(user_id))
+        conn.commit()
+
+    _set_session_cookie(response, raw_token)
+    return {"email": email, "packageId": package_id}
+
+
+@app.post("/api/auth/login")
+def login(body: LoginBody, response: Response) -> dict:
+    settings = get_settings()
+    email = normalize_email(body.email)
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, password_hash FROM users WHERE email = %s", (email,))
+            row = cur.fetchone()
+        # One message for both "no such account" and "wrong password", so this
+        # cannot be used to discover which emails have accounts.
+        if row is None or not verify_password(row[1], body.password):
+            raise HTTPException(status_code=401, detail="Email or password is incorrect.")
+        user_id = str(row[0])
+        raw_token, _ = create_session(conn, user_id)
+        package_id = package_for_user(conn, user_id)
+        if package_id is None:
+            package_id = _create_register_for(conn, user_id, email)
+        conn.commit()
+
+    _set_session_cookie(response, raw_token)
+    return {"email": email, "packageId": package_id}
+
+
+# --- Google sign-in (OAuth 2.0 authorization code flow) ----------------------
+#
+# Optional: with GOOGLE_CLIENT_ID/SECRET unset the option simply does not appear
+# and email + password continues to work.
+#
+# The code is exchanged server-side and the profile read from Google's userinfo
+# endpoint over TLS, so the browser never handles a token and there is no JWT
+# signature to verify in our own code -- one less thing to get subtly wrong.
+_GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN = "https://oauth2.googleapis.com/token"
+_GOOGLE_USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo"
+_OAUTH_STATE_COOKIE = "cr_oauth_state"
+
+
+def _public_base(request: Request) -> str:
+    settings = get_settings()
+    if settings.public_base_url:
+        return settings.public_base_url
+    # Behind Railway's proxy the app itself speaks http; the forwarded header is
+    # what says the public URL is https. Getting this wrong makes the redirect
+    # URI mismatch what Google has registered.
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    return f"{proto}://{host}"
+
+
+def _redirect_uri(request: Request) -> str:
+    return f"{_public_base(request)}/api/auth/google/callback"
+
+
+@app.get("/api/auth/google/start")
+def google_start(request: Request, invite: str = "") -> Response:
+    settings = get_settings()
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(status_code=404, detail="Google sign-in is not configured.")
+
+    # The state is echoed back by Google and compared against a cookie: that is
+    # what stops a third party from replaying a callback into someone's session.
+    # The invite code rides along so a NEW account can still be gated by it --
+    # there is no form to carry it on once the browser leaves for Google.
+    nonce = secrets.token_urlsafe(24)
+    state = f"{nonce}:{urllib.parse.quote(invite, safe='')}"
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": _redirect_uri(request),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "prompt": "select_account",
+    }
+    response = RedirectResponse(f"{_GOOGLE_AUTH}?{urllib.parse.urlencode(params)}", status_code=302)
+    response.set_cookie(_OAUTH_STATE_COOKIE, nonce, httponly=True, secure=True,
+                        samesite="lax", max_age=600, path="/")
+    return response
+
+
+@app.get("/api/auth/google/callback")
+def google_callback(request: Request, code: str = "", state: str = "") -> Response:
+    settings = get_settings()
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(status_code=404, detail="Google sign-in is not configured.")
+
+    expected = request.cookies.get(_OAUTH_STATE_COOKIE)
+    nonce, _, invite_quoted = state.partition(":")
+    if not expected or not secrets.compare_digest(expected, nonce):
+        raise HTTPException(status_code=400, detail="Sign-in could not be verified. Try again.")
+    invite = urllib.parse.unquote(invite_quoted)
+
+    with httpx.Client(timeout=20) as client:
+        token_res = client.post(_GOOGLE_TOKEN, data={
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": _redirect_uri(request),
+            "grant_type": "authorization_code",
+        })
+        if token_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Google rejected the sign-in.")
+        access_token = token_res.json().get("access_token")
+        info_res = client.get(_GOOGLE_USERINFO, headers={"Authorization": f"Bearer {access_token}"})
+        if info_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Could not read the Google profile.")
+        info = info_res.json()
+
+    email = normalize_email(info.get("email") or "")
+    google_sub = info.get("sub")
+    # An unverified address must not be trusted: it would let someone claim an
+    # account belonging to an email they do not control.
+    if not email or not info.get("email_verified") or not google_sub:
+        raise HTTPException(status_code=400, detail="That Google account has no verified email.")
+
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE google_sub = %s OR email = %s", (google_sub, email)
+            )
+            row = cur.fetchone()
+            if row is None:
+                # New account: still gated by the invite code, or this instance
+                # would be open to anyone with a Google account.
+                if settings.app_password and invite != settings.app_password:
+                    return RedirectResponse("/?error=invite", status_code=302)
+                cur.execute(
+                    "INSERT INTO users (email, google_sub) VALUES (%s, %s) RETURNING id",
+                    (email, google_sub),
+                )
+                (user_id,) = cur.fetchone()
+                _create_register_for(conn, str(user_id), email)
+            else:
+                (user_id,) = row
+                # Links Google to an account first created with a password, so
+                # the same person does not end up with two registers.
+                cur.execute(
+                    "UPDATE users SET google_sub = %s WHERE id = %s AND google_sub IS NULL",
+                    (google_sub, user_id),
+                )
+        raw_token, _ = create_session(conn, str(user_id))
+        conn.commit()
+
+    response = RedirectResponse("/", status_code=302)
+    _set_session_cookie(response, raw_token)
+    response.delete_cookie(_OAUTH_STATE_COOKIE, path="/")
+    return response
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response) -> dict:
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        settings = get_settings()
         with psycopg.connect(settings.database_url) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM packages ORDER BY created_at LIMIT 1")
-                row = cur.fetchone()
-        package_id = str(row[0]) if row else None
-    return {"packageId": package_id}
+            delete_session(conn, token)
+            conn.commit()
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"signedIn": False}
+
+
+@app.get("/api/auth/me")
+def me(request: Request) -> dict:
+    settings = get_settings()
+    # The sign-in screen reads this to decide whether to offer Google at all,
+    # so it has to report availability even when signed out.
+    google = bool(settings.google_client_id and settings.google_client_secret)
+    with psycopg.connect(settings.database_url) as conn:
+        user = user_for_token(conn, request.cookies.get(SESSION_COOKIE))
+        if user is None:
+            return {"signedIn": False, "email": None, "packageId": None, "googleEnabled": google}
+        user_id, email = user
+        return {"signedIn": True, "email": email,
+                "packageId": package_for_user(conn, user_id), "googleEnabled": google}
 
 
 def _ingest_blocking(
@@ -173,6 +457,7 @@ def _ingest_blocking(
 @app.post("/api/packages/{package_id}/documents")
 async def upload_document(
     package_id: str,
+    request: Request,
     file: UploadFile = File(...),
     openai_api_key: str | None = Form(None),
 ) -> dict:
@@ -180,6 +465,9 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_package(conn, user_id, package_id)
     # A key typed into the browser (per-request, from Form) takes priority over
     # the server's own .env -- this lets a second person use their own OpenAI
     # quota against a shared instance without ever touching the server's
@@ -229,8 +517,11 @@ async def upload_document(
 
 
 @app.get("/api/packages/{package_id}")
-def get_package(package_id: str) -> dict:
+def get_package(package_id: str, request: Request) -> dict:
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_package(conn, user_id, package_id)
     with psycopg.connect(settings.database_url) as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT name, contract_no FROM packages WHERE id = %s",
@@ -256,8 +547,11 @@ def get_package(package_id: str) -> dict:
 
 
 @app.get("/api/packages/{package_id}/letters")
-def list_letters(package_id: str) -> list[dict]:
+def list_letters(package_id: str, request: Request) -> list[dict]:
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_package(conn, user_id, package_id)
     with psycopg.connect(settings.database_url) as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -341,14 +635,107 @@ def list_letters(package_id: str) -> list[dict]:
     return results
 
 
+@app.get("/api/packages/{package_id}/documents")
+def list_documents(package_id: str, request: Request) -> list[dict]:
+    """Upload history: what went in, when, and what came of it.
+
+    Without this a document that failed extraction is simply ABSENT from the
+    register, which looks identical to never having been uploaded. Showing the
+    failure and its reason is the difference between a register you can trust to
+    be complete and one you merely hope is.
+    """
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_package(conn, user_id, package_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT d.sha256, d.original_filename, d.byte_size, d.ingested_at,
+                       (SELECT count(*) FROM document_pages dp
+                         WHERE dp.document_sha256 = d.sha256) AS pages,
+                       (SELECT count(*) FROM letters l
+                         WHERE l.document_sha256 = d.sha256 AND l.package_id = %s
+                           AND l.is_current) AS letters,
+                       er.status, er.error
+                FROM package_documents pd
+                JOIN documents d ON d.sha256 = pd.document_sha256
+                LEFT JOIN extraction_runs er
+                       ON er.document_sha256 = d.sha256
+                      AND er.package_id = pd.package_id AND er.is_current
+                WHERE pd.package_id = %s
+                ORDER BY d.ingested_at DESC
+                """,
+                (package_id, package_id),
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "sha256": sha256,
+            "filename": filename,
+            "byteSize": byte_size,
+            "ingestedAt": ingested_at.isoformat(),
+            "pages": pages,
+            "letters": letters,
+            "status": status or "unknown",
+            "error": error,
+        }
+        for sha256, filename, byte_size, ingested_at, pages, letters, status, error in rows
+    ]
+
+
+@app.get("/api/documents/{sha256}/original")
+def download_original(sha256: str, request: Request):
+    """The original PDF back out of the register, byte-for-byte.
+
+    Serving the stored bytes rather than anything re-derived matters here: this
+    is the artefact an annexure bundle would contain, and its sha256 is its
+    identity, so what comes out must be exactly what went in.
+    """
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_document(conn, user_id, sha256)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT storage_uri, original_filename FROM documents WHERE sha256 = %s", (sha256,)
+            )
+            row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="No such document.")
+    path = Path(row[0].removeprefix("file://"))
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Original file missing from storage.")
+    # HTTP headers are latin-1; real filenames here are not. One of these
+    # documents is "... GFC Drawing \u2013 Superstructure ...", whose en dash
+    # raised UnicodeEncodeError and turned the download into a 500. RFC 6266:
+    # an ASCII-safe `filename` for old clients plus `filename*` carrying the
+    # real UTF-8 name.
+    filename = row[1]
+    ascii_name = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
+    quoted = urllib.parse.quote(filename, safe="")
+    return Response(
+        content=path.read_bytes(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quoted}'
+        },
+    )
+
+
 @app.get("/api/letters/{letter_id}/fields")
-def get_letter_fields(letter_id: str) -> list[dict]:
+def get_letter_fields(letter_id: str, request: Request) -> list[dict]:
     """Per-field provenance for one letter: the exact page, bounding box, and
     validation outcome behind every extracted value -- the citation data
     PIPELINE.md's click-to-locate feature is built on. `bbox` is null when
     validation is 'unresolved' (nothing to point at) and always normalized 0..1
     against the page image, not pixels, so it works at any raster resolution."""
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_letter(conn, user_id, letter_id)
     with psycopg.connect(settings.database_url) as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -377,10 +764,13 @@ def get_letter_fields(letter_id: str) -> list[dict]:
 
 
 @app.get("/api/documents/{sha256}/pages/{page_no}/raster")
-def get_page_raster(sha256: str, page_no: int):
+def get_page_raster(sha256: str, page_no: int, request: Request):
     """Serves the actual rasterized scan for one page -- the real source image
     the register's extracted values were read from, not a placeholder."""
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_document(conn, user_id, sha256)
     with psycopg.connect(settings.database_url) as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -401,13 +791,16 @@ def get_page_raster(sha256: str, page_no: int):
 
 
 @app.get("/api/packages/{package_id}/citations/ambiguous")
-def list_ambiguous_citations(package_id: str) -> list[dict]:
+def list_ambiguous_citations(package_id: str, request: Request) -> list[dict]:
     """Citations that fuzzy-matched a candidate but were never auto-resolved --
     see link.py's reasoning: the exact digits that would tell two real letters
     apart are the part most vulnerable to OCR noise, so a plausible-looking
     match is not the same thing as a confirmed one. This is the review queue a
     human works through to actually confirm (or leave alone) each one."""
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_package(conn, user_id, package_id)
     with psycopg.connect(settings.database_url) as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -463,11 +856,14 @@ class ConfirmCitationBody(BaseModel):
 
 
 @app.post("/api/citations/{citation_id}/confirm")
-def confirm_citation(citation_id: str, body: ConfirmCitationBody) -> dict:
+def confirm_citation(citation_id: str, body: ConfirmCitationBody, request: Request) -> dict:
     """Links a citation to the human-confirmed candidate and re-threads the
     package. This is the ONLY path that turns a fuzzy match into a resolved
     one -- the pipeline itself never does this automatically."""
     settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        user_id, _ = require_user(request, conn)
+        assert_owns_citation(conn, user_id, citation_id)
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
             cur.execute(

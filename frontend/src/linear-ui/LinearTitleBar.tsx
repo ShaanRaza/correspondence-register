@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { PackageInfo } from "../types";
 import { formatDate } from "../lib/dates";
 import { matchSuggestions, type Suggestion } from "../lib/suggest";
+import { signOut } from "../lib/api";
 import styles from "./LinearTitleBar.module.css";
 
 export function LinearTitleBar({
@@ -15,6 +16,7 @@ export function LinearTitleBar({
   onOpenReview,
   reviewCount,
   suggestions = [],
+  onOpenDocuments,
 }: {
   pkg: PackageInfo;
   visibleCount: number;
@@ -29,6 +31,7 @@ export function LinearTitleBar({
   reviewCount?: number;
   /** Vocabulary drawn from this package's own letters (lib/suggest.ts). */
   suggestions?: Suggestion[];
+  onOpenDocuments?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -143,8 +146,23 @@ export function LinearTitleBar({
             Review ({reviewCount})
           </button>
         )}
+        {onOpenDocuments && (
+          <button className={styles.uploadButton} onClick={onOpenDocuments}>
+            Documents
+          </button>
+        )}
         <button className={styles.uploadButton} onClick={onOpenUpload}>
           Upload
+        </button>
+        <button
+          className={styles.uploadButton}
+          title="Sign out of this register"
+          onClick={async () => {
+            await signOut();
+            window.location.reload();
+          }}
+        >
+          Sign out
         </button>
       </div>
     </div>

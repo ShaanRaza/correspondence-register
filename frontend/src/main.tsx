@@ -26,7 +26,7 @@ import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 
 import Root from "./Root.tsx";
-import { PasswordGate } from "./PasswordGate.tsx";
+import { AuthGate } from "./AuthGate.tsx";
 import { bootstrapConfig } from "./lib/api";
 
 // Resolve the package id from the backend before first render, so no component
@@ -34,9 +34,9 @@ import { bootstrapConfig } from "./lib/api";
 bootstrapConfig().then(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <PasswordGate>
+      <AuthGate>
         <Root />
-      </PasswordGate>
+      </AuthGate>
     </StrictMode>,
   );
 });
